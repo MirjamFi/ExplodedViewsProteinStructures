@@ -13,7 +13,7 @@ cmd.set('ignore_case', 'off') ## case sensitive for chain ids
 # da.axes()
 
 ''' load complex from PDB'''
-pdbName = '2brn'
+pdbName = '3oaa'
 pdbFile = pdbName + '.pdb1'
 cmd.fetch(pdbName, type='pdb1')
 cmd.set('all_states', 'on')
@@ -115,26 +115,29 @@ for state in range(1,cmd.count_states()+1):
 		if len(chains) > 1:	
 			## translate chain
 			translate_selection(complex_xyz, chain_xyz, chainname, 50)
+			cmd.delete(chainname + '_COM')
 		
 		## translate ligands on current chain, if ligands are present
 		if stored.ligands:
 		
 			## if chain has been translated, calculate COM of translated chain
 			if len(chains) > 1:
-				cmd.delete(chainname + '_COM')
 				cenma.com(chainname, state = 1)
 				cmd.zoom(chainname + '_COM')
 				chain_xyz = cmd.get_position(chainname + '_COM')
 					
 			## delete chain's COM
 			cmd.delete(chainname + '_COM')
-			## COM of ligand
+			
+			## select ligand on chain
 			selection = chainname + " & organic"
 			ligandname = chainname + "_org"
-			cmd.create(ligandname, selection)
 			
 			## only translate if chain really has a ligand
 			if cmd.count_atoms(selection) > 0:
+				cmd.create(ligandname, selection)
+				
+				## calculate COM of ligand
 				cenma.com(ligandname, state = 1)
 				cmd.zoom(ligandname + '_COM')
 				ligand_xyz = cmd.get_position(ligandname + '_COM')
