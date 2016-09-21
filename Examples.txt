@@ -1,0 +1,21 @@
+3oaa: E.coli ATP synthase (8-mer)
+2IH3: K+ channel (12-mer)
+5K7L: ein anderer K+ channel (8-mer)
+
+5EN5: bacterial efflux pump (6-mer)    
+
+
+1ERI: DNA + endonuclease (2-mer + DNA)
+4ESV: DNA + helicase (6-mer)
+3OM3: Tobacco Mosaic Virus (49-mer)
+
+Für die ganz Ambitionierten: (ALS PDB keine multi-mere)
+2BUK: Satellite Tobacco Necrosis Virus (60-mer)
+3IYN: cryo-EM structure of human adenovirus (1200-mer)
+1OHG: capsid (420-mer)
+
+
+Problematisch:
+1VQP: Transition state analogue "RAP" bound to the large ribosomal subunit (27-mer) enthält als chain id integer
+5J4B: bacterial ribosome bound to cisplatin (27-mer) kein Standard-PDB Format
+5IT8: bacterial ribosome (55-mer) kein Standard-PDB Format
