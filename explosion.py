@@ -1,8 +1,6 @@
-# run C:/Users/Figaschewski/Dropbox/Masterarbeit/test.py
+# run C:/Users/Figaschewski/Dropbox/Masterarbeit/Masterthesis/explosion.py
 
 from pymol import cmd 
-#from Bio.PDB import * # parse PDB file
-#import elements_from_PDB as efPDB 
 import get_colors
 import math
 import center_of_mass as cenma
@@ -20,17 +18,13 @@ pdbFile = pdbName + '.pdb1'
 cmd.fetch(pdbName, type='pdb1')
 cmd.set('all_states', 'on')
 cmd.remove('solvent')
+cmd.show('spheres', 'organic')
 
 ''' get chains of complex'''
 chains = cmd.get_chains(pdbName)
 
-'''create object for each chain in selection '''
+#'''create object for each chain in selection '''
 # cmd.split_chains(pdbName)
-
-''' parse pdb '''
-# parser = PDBParser()
-# structure = parser.get_structure(pdbName, pdbFile)
-# chains = []
 
 ''' get all ligands (organic) from complex'''
 """import stored for passing data back and forth"""
@@ -59,6 +53,20 @@ while cmd.count_atoms("allOrg") != 0:
 cmd.delete('allOrg')
 cmd.delete('temp')
 
+''' translate an object relative to complex of origin using center of mass'''
+def translate_selection(original_xyz, trans_xyz, transname, factor):
+	## vector between COMs to translate chain
+	dist=math.sqrt((trans_xyz[0]-original_xyz[0])**2 +
+					(trans_xyz[1]-original_xyz[1])**2 +
+					(trans_xyz[2]-original_xyz[2])**2)
+
+	vector=((trans_xyz[0]-original_xyz[0])/dist, 
+			(trans_xyz[1]-original_xyz[1])/dist, 
+			(trans_xyz[2]-original_xyz[2])/dist)
+	trans_vec = [x * factor for x in vector] 
+
+	## translate chain with vector
+	cmd.translate(trans_vec,transname, camera=0)
 
 ''' Explosion'''
 ## create models for all states of complex
@@ -67,9 +75,11 @@ states = cmd.split_states(pdbName)
 """for each state create an object of every chain. In this state
  calulate COM for state and according chains and translate chain along 
  vector between COMs of state and chain"""
+ 
 com_num = ""
 for state in range(1,cmd.count_states()+1):
-	if state == 0:
+	## state = 0 would calculate the COM for all states at once
+	if state == 0: 
 		continue
 
 	## name chain object in this state
@@ -95,28 +105,47 @@ for state in range(1,cmd.count_states()+1):
 
 		origin = pdbName+'_'+s+ ' & chain '+c
 		cmd.create(chainname, origin)
-
-		## COM of chain
-		cenma.com(chainname, state = 1)
-		cmd.zoom(chainname + '_COM')
-		chain_xyz = cmd.get_position(chainname + '_COM')
 		
-		## vector between COMs to translate chain
-		dist=math.sqrt((chain_xyz[0]-complex_xyz[0])**2 +
-						(chain_xyz[1]-complex_xyz[1])**2 +
-						(chain_xyz[2]-complex_xyz[2])**2)
-
-		vector=((chain_xyz[0]-complex_xyz[0])/dist, 
-				(chain_xyz[1]-complex_xyz[1])/dist, 
-				(chain_xyz[2]-complex_xyz[2])/dist)
-		trans_vec = [x * 50 for x in vector] 
-
-		## translate chain with vector
-		cmd.translate(trans_vec,chainname, camera=0)
+		if len(chains) > 1:
+			## COM of chain
+			cenma.com(chainname, state = 1)
+			cmd.zoom(chainname + '_COM')
+			chain_xyz = cmd.get_position(chainname + '_COM')
+			
+			## translate chain
+			translate_selection(complex_xyz, chain_xyz, chainname, 50)
 		
+		## translate ligands on current chain
+		if stored.ligands:
+			## COM of ligand
+			selection = chainname + " & organic"
+			ligandname = chainname + "_org"
+			cmd.create(ligandname, selection)
+			
+			## only translate if chain really has a ligand
+			if cmd.count_atoms(selection) > 0:
+				cenma.com(ligandname, state = 1)
+				cmd.zoom(ligandname + '_COM')
+				ligand_xyz = cmd.get_position(ligandname + '_COM')
+				
+				## translate ligand
+				translate_selection(chain_xyz, ligand_xyz, ligandname, 30)
+
+				## delete ligand's COM
+				cmd.delete(ligandname + '_COM')
+			
+				## color binding site
+				binding = 'byres (' + chainname + ' nto. 3 of organic)'
+				cmd.select('inter', binding)
+				cmd.color('red', 'inter')
+				cmd.delete('inter')
+				
+				## remove ligand from translated chain
+				cmd.remove(selection)	
+				
 		## delete chain's COM
 		cmd.delete(chainname + '_COM')
-		
+	
 	## delete state object
 	cmd.delete(pdbName + "_"+ s)
 	
@@ -124,31 +153,4 @@ for state in range(1,cmd.count_states()+1):
 	cmd.delete(pdbName + "_" + s + '_COM')
 		
 cmd.zoom('all')
-
-
-
-''' get all elements in pdb (molecule names with chains, chains with ligands) '''
-# chains_per_molecule, ligands_per_chain = efPDB.getElementsFromPDB(structure,
-										# pdbFile)	
-# print chains_per_molecule, ligands_per_chain
-
-# ''' show molecules in different colors and highlight ligands as spheres'''
-# for key in chains_per_molecule:
-	# if chains_per_molecule[key]:
-		# chains = "+".join(chains_per_molecule[key])
-		# chains = "chain " + chains
-		# cmd.create(key, chains)
-		# cmd.color(get_colors.get_random_color(), chains)
-		
-# cmd.show('spheres', 'organic')
-# #cmd.delete(pdbName)	# delete original pdb, keep separated molecules
-
-# ''' color binding site of ligands and coresponding chain'''
-# for key in ligands_per_chain:
-	# if ligands_per_chain[key]:
-		# for value in ligands_per_chain[key]:
-			# selection = 'byres (chain ' + key + ' nto. 3 of resn ' + value + ')'
-			# cmd.select('inter', selection)
-			# cmd.color('red', 'inter')
-			# cmd.delete('inter')
 			
