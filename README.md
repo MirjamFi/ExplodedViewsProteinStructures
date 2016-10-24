@@ -3,7 +3,8 @@
 ## Abstract
 
 3D protein structure models such as those deposited in the protein databank (PDB) often consist of multiple parts, e.g. multiple proteins, chains, binding partners (DNA, RNA), and ligands. Sometimes, important parts are occluded from the default viewpoint or even from *any* camera position. In order get an overview of the composition of such complex arrangements, *exploded views* as known from engineering will be applied to molecular structures in this work. An illustrative example of such an exploded view for the 70S Ribosome that was created manually is shown here on the right:
-<img src="https://bmcresearch.utm.utoronto.ca/sciencevislab/wp-content/media/2013/12/70S_Ribosome_1920x1080.jpg" style="width: 640px;"></img>
+
+<img src='https://bmcresearch.utm.utoronto.ca/sciencevislab/wp-content/media/2013/12/70S_Ribosome_1920x1080.jpg' style='width: 640px;'></img>
 
 We anticipate that interactive exploded views will greatly help users (in particular students) to (1) get an overview of composition of complex molecular structures and (2) better understand how the individual parts of a complex work. An additional benefit of this work is to quickly to obtain overview figures that can be used for presentation.
 
