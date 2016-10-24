@@ -47,15 +47,46 @@ def calc_COM(transname):
 	cmd.zoom(transname + '_COM')
 	pos = cmd.get_position(transname + '_COM')
 	cmd.delete(transname + '_COM')
-	cmd.set_view (
-			'0.453708082,   -0.681963921,   -0.573648989,\
-			-0.331614792,    0.468286544,   -0.818986893,\
-			0.827151597,    0.561811924,   -0.013684246,\
-			0.000000000,    0.000000000, -981.596557617,\
-			-68.949493408,  -24.481521606,    5.007858276,\
-			773.898193359, 1189.294921875,  -20.000000000' )
+	cmd.set_view ( 
+'-0.346189618,   -0.600477457,   -0.720818758,\
+     0.038613044,    0.758557022,   -0.650460541,\
+     0.937369645,   -0.253015876,   -0.239418939,\
+     0.000000000,    0.000000000, -1473.033813477,\
+   -73.633697510,  -31.334754944,    1.869384766,\
+  1161.351074219, 1784.716552734,  -20.000000000'	)
 	return pos
 		
+
+def isColliding(sel1, sel2):
+	''' DESCIPTION:
+		calculate if two bounding boxes are colliding
+	'''
+	box1_min, box1_max = cmd.get_extent(sel1)
+	box2_min, box2_max = cmd.get_extent(sel2)
+
+	## min, max vertices of box 1
+	x_min1 = box1_min[0]
+	y_min1 = box1_min[1]
+	z_min1 = box1_min[2]
+	x_max1 = box1_max[0]
+	y_max1 = box1_max[1]
+	z_max1 = box1_max[2]
+	
+	## min, max vertices of box 2
+	x_min2 = box2_min[0]
+	y_min2 = box2_min[1]
+	z_min2 = box2_min[2]
+	x_max2 = box2_max[0]
+	y_max2 = box2_max[1]
+	z_max2 = box2_max[2]
+	
+	## test if any of the vertices of box 1 are in any of the faces of box 2 and vice versa
+	isColliding = 	(x_min1 <= x_max2 and x_max1 >= x_min2) and \
+					(y_min1 <= y_max2 and y_max1 >= y_min2) and \
+					(z_min1 <= z_max2 and z_max1 >= z_min2)
+	
+
+	return isColliding
 	 
 def explosion(pdbName):
 	''' DESCRIPTION:
@@ -71,6 +102,11 @@ def explosion(pdbName):
 	cmd.show('spheres', 'organic')
 	util.cbc(selection= pdbName)
 	
+	## calculate translation factor
+	protDim_min, protDim_max = cmd.get_extent(pdbName)
+	transFac = math.sqrt((protDim_max[0] - protDim_min[0]) ** 2 +
+                     (protDim_max[1] - protDim_min[1]) ** 2 +
+                     (protDim_max[2] - protDim_min[2]) ** 2)/2
 	##get chains of complex
 	chains = cmd.get_chains(pdbName)
 
@@ -108,15 +144,17 @@ def explosion(pdbName):
 	cmd.config_mouse('three_button_motions', 1)
 
 	frameNum = 50
-	frames = str(frameNum * (len(cmd.get_chains()) + len(stored.ligands))+50)
+	frames = str(160)
 	cmd.mset('1 x' + frames)
+	cmd.orient('all')
+	
 	cmd.set_view (
-		'0.453708082,   -0.681963921,   -0.573648989,\
-		-0.331614792,    0.468286544,   -0.818986893,\
-		 0.827151597,    0.561811924,   -0.013684246,\
-		 0.000000000,    0.000000000, -981.596557617,\
-	   -68.949493408,  -24.481521606,    5.007858276,\
-	   773.898193359, 1189.294921875,  -20.000000000 ')
+		'-0.346189618,   -0.600477457,   -0.720818758,\
+     0.038613044,    0.758557022,   -0.650460541,\
+     0.937369645,   -0.253015876,   -0.239418939,\
+     0.000000000,    0.000000000, -1473.033813477,\
+   -73.633697510,  -31.334754944,    1.869384766,\
+  1161.351074219, 1784.716552734,  -20.000000000 ')
 
 			
 	''' Explosion: for each state create an object of every chain and for 
@@ -149,6 +187,11 @@ def explosion(pdbName):
 		ligandsCOMS = {}
 		f = 1
 		cmd.delete(pdbName)
+		
+		## list all chain and ligand pairs
+		chainAndLigand = {}
+		ligandAndChain = {}
+		
 		for c in chains:	
 			## color each chain individually
 			if cmd.count_states() > 1:
@@ -175,7 +218,7 @@ def explosion(pdbName):
 				selection = chainname + ' & organic'
 				ligandname = chainname + '_org'
 
-				## only translate if chain really has a ligand
+				## get pair of ligand and respective chain
 				if cmd.count_atoms(selection) > 0:
 					cmd.extract(ligandname, selection)
 					## calculate COM of ligand
@@ -186,45 +229,69 @@ def explosion(pdbName):
 					cmd.select('inter', binding)
 					cmd.color('red', 'inter')
 					cmd.delete('inter')
+					
+					## group chains and respective ligands to translate them together at first
+					cmd.group('CL_' + chainname + "_" + ligandname, chainname + " and " + ligandname)
+					chainAndLigand[chainname] = 'CL_' + chainname + "_" + ligandname
+					ligandAndChain[ligandname] = chainname
 		
-		f = frameNum
-		cmd.frame(f)
+		
+		cmd.frame(f+10)
 		## store chain objects for movie
 		for cname in cNames:
 			cmd.mview('store', object=cname)
-		## store ligand objects for movie
 		for ligand in ligandsCOMS.keys():
 			cmd.mview('store', object=ligand)
-		f = f + frameNum
-
+		
+		f = frameNum
 		## translate chains iteratively 
 		for chainname in cNames:
-			## get dimensions of chain 
-			#([minX, minY, minZ],[maxX, maxY, maxZ]) = cmd.get_extent(chainname)
-			## coordinates
-			#[x,y,z] = (maxX-minX, maxY-minY, maxZ-minZ)
-			## volume
-			#vol = ((maxX-minX)*(maxY-minY)*(maxZ-minZ))
-			#print [x,y,z], vol
 			
 			## COM of chain
 			chainXYZ = chainsCOMS[chainname]
 
 			## only translate chain if there are multiple chains
 			if len(chains) > 1:	
+			
 				## translate chains and ligands
 				for cname in cNames:
-					cXYZ = chainsCOMS[cname]
-					translate_selection(complexXYZ, cXYZ, cname, 20, f)
-				for ligand in ligandsCOMS.keys():
-					ligandXYZ = ligandsCOMS[ligand]
-					translate_selection(complexXYZ, ligandXYZ, ligand, 20, f)
+					if cname != chainname:
+						while isColliding(chainname, cname):
+							for cname in cNames:
+								cXYZ = chainsCOMS[cname]
+								if cname in chainAndLigand.keys():
+									translate_selection(
+										complexXYZ, cXYZ, 
+										chainAndLigand[cname], transFac, f)
+									continue
+								translate_selection(
+										complexXYZ, cXYZ, cname, transFac, f)
+		
+		## ungroup chains and ligands to translate ligands seperately from chains
+		for cl in chainAndLigand.keys():
+			cmd.ungroup(cl)
+			cmd.ungroup(cl+'_org')
+			cmd.delete(chainAndLigand[cl])
 
-			f = f + frameNum
-		## translate ligands once more for greater distance to related chains
+		## store objects for movie
+		cmd.frame(f)
 		for ligand in ligandsCOMS.keys():
+			cmd.mview('store', object=ligand)
+		for cname in cNames:
+			cmd.mview('store', object=cname)
+			
+		f = f + frameNum
+		cmd.frame(f)
+		
+		## translate ligands
+		for ligand in ligandAndChain.keys():
+			cXYZ = chainsCOMS[ligandAndChain[ligand]]
 			ligandXYZ = ligandsCOMS[ligand]
-			translate_selection(complexXYZ, ligandXYZ, ligand, 10, f)
+			while isColliding(ligand, ligandAndChain[ligand]):
+				translate_selection(cXYZ, ligandXYZ, ligand, transFac/2, f)
+		for cname in cNames:
+			cmd.mview('store', object=cname)
+		f = f + frameNum
 
 		## delete state object
 		cmd.delete(pdbName + '_'+ s)	
@@ -233,3 +300,4 @@ def explosion(pdbName):
 	print time.clock() - start_time, 'seconds'
 	
 cmd.extend('explosion', explosion)
+cmd.extend('isColliding', isColliding)
