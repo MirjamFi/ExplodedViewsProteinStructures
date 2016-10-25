@@ -14,10 +14,10 @@ cmd.delete('all')
 cmd.set('ignore_case', 'off') ## case sensitive for chain ids
 
 ''' load complex from PDB'''
-pdbName = '3oaa'
+pdbName = '5lmo'
 pdbFile = pdbName + '.pdb1'
 cmd.fetch(pdbName, type='pdb1')
-cmd.set('all_states', 'on')
+#cmd.set('all_states', 'on')
 cmd.remove('solvent')
 cmd.show('spheres', 'organic')
 util.cbc(selection= pdbName)
@@ -141,7 +141,7 @@ for state in range(1,cmd.count_states()+1):
 						## (to keep shape of complex)
 						if cmd.count_atoms(nearC) > 0:
 		
-							## translate other chains
+							## translate chains
 							for cname in cNames:
 								cXYZ = chainsCOMS[cname]
 								translate_selection(complexXYZ, cXYZ, cname, 20)
