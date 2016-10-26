@@ -10,8 +10,12 @@
 	Create an movie of an exploded view for a given protein structure (PDB) or 
 	parts of it.
 	You can select single or multiple chains to be exploded, just extract them 
-	into one object from source structure. If chains contains ligands, those 
+	into one object from source structure. If chains contain ligands, those 
 	will also be exploded.
+	To explod specific chains it can be useful to also give the complex for 
+	explosion directon, espacially for single chain, so the chain is not 
+	translated into the complex.
+	Exploded parts will be labeled.
 '''
 from pymol import cmd 
 import math
@@ -42,6 +46,7 @@ def translate_selection(originXYZ, transXYZ, transname, factor, f, group):
 	cmd.mview('store', object=group)
 	cmd.mview('interpolate', object=group)
 	
+	
 
 def calc_COM(transname):
 	'''DESCRIPTION:
@@ -51,13 +56,9 @@ def calc_COM(transname):
 	cmd.zoom(transname + '_COM')
 	pos = cmd.get_position(transname + '_COM')
 	cmd.delete(transname + '_COM')
-	cmd.set_view ( 
-		'-0.346189618,   -0.600477457,   -0.720818758,\
-		0.038613044,    0.758557022,   -0.650460541,\
-		0.937369645,   -0.253015876,   -0.239418939,\
-		0.000000000,    0.000000000, -1473.033813477,\
-		-73.633697510,  -31.334754944,    1.869384766,\
-		1161.351074219, 1784.716552734,  -20.000000000'	)
+	cmd.zoom('all', complete = 1)
+	cmd.mview('store')
+
 	return pos
 		
 
@@ -103,7 +104,7 @@ def calcTransFac(sele):
 					 (protDim_max[2] - protDim_min[2]) ** 2)/2
 	return transFac
 	
-def explosion(selected):
+def explosion(selected, complex = None):
 	''' DESCRIPTION:
 		create a movie for an exploded view of given protein
 	'''
@@ -117,7 +118,7 @@ def explosion(selected):
 	cmd.show('spheres', 'organic')
 	util.cbc(selection= selected)
 	
-	## calculate translation factor
+	## calculate translation factor which is the size of the selection
 	transFac = calcTransFac(selected)
 	
 	##get chains of complex
@@ -163,16 +164,7 @@ def explosion(selected):
 	frameNum = 50
 	frames = str(160)
 	cmd.mset('1 x' + frames)
-	cmd.orient('all')
-	
-	cmd.set_view (
-		'-0.346189618,   -0.600477457,   -0.720818758,\
-		0.038613044,    0.758557022,   -0.650460541,\
-		0.937369645,   -0.253015876,   -0.239418939,\
-		0.000000000,    0.000000000, -1473.033813477,\
-		-73.633697510,  -31.334754944,    1.869384766,\
-		1161.351074219, 1784.716552734,  -20.000000000 ')
-
+	cmd.orient(selected)
 			
 	''' Explosion: for each state create an object of every chain and for 
 		related ligands. In this state calulate COM for state and according 
@@ -195,7 +187,12 @@ def explosion(selected):
 			s = '0' + s
 			
 		## COM of state (all chains)
-		complexXYZ = calc_COM(selected + '_' + s)
+		## if only some chains are selected and source complex is given,
+		## select source complex for COM calculation
+		if complex:
+			complexXYZ = calc_COM(complex)
+		else:
+			complexXYZ = calc_COM(selected + '_' + s)
 
 		## calculate COM for single chains in state
 		cNames = []
@@ -269,7 +266,7 @@ def explosion(selected):
 						cmd.delete('inter')
 						
 						## group chains and respective ligands to translate them 
-						## together at first
+						## together at first (including their labels)
 						cmd.group(chainname + "_" + ligandname, 
 										chainname + " " + ligandname \
 										+ " " + "_tmpPoint" + chainname \
@@ -277,12 +274,11 @@ def explosion(selected):
 						chainAndLigand[chainname] = chainname + \
 														"_" + ligandname
 						ligandAndChain[ligandname] = chainname
-		
+			
+			## if there is no ligand on chain, just keep chain and its label
 			if chainname not in chainAndLigand.keys():
 				cmd.group(chainname + "_", chainname + " and " + "_tmpPoint" + 
 							chainname)
-
-					
 		
 		cmd.frame(f+10)
 		## store chain objects for movie
@@ -322,17 +318,37 @@ def explosion(selected):
 										
 			## if only one chain is selected, translate it and its ligand
 			else:
-				cmd.translate([transFac, transFac, transFac], 
-									object = chainAndLigand[chainname])
-				
+				if complex:
+					while isColliding(chainname, complex):
+						if chainname in chainAndLigand.keys():
+							translate_selection(complexXYZ, chainXYZ, 
+									chainAndLigand[chainname], transFac, f, 
+									chainAndLigand[chainname])
+
+						else:
+							translate_selection(complexXYZ, chainXYZ, 
+									chainname + "_", transFac, f, 
+									chainname + "_")
+				else:
+					if chainname in chainAndLigand.keys():
+							cmd.translate([transFac, transFac, transFac], 
+											object = chainAndLigand[chainname])
+					else:
+						cmd.translate([transFac, transFac, transFac], 
+											object = chainname + "_")
+						
 		
 		## store objects for movie
 		cmd.frame(f)
+		cmd.zoom('all', complete = 1)
+		cmd.mview('store')
 		for group in cmd.get_names("objects"):
 			cmd.mview('store', object = group)
-			
+
 		f = f + frameNum/2
 		cmd.frame(f)
+		cmd.zoom('all', complete = 1 )
+		cmd.mview('store')
 		
 		## translate ligands
 		for ligand in ligandAndChain.keys():
@@ -350,18 +366,21 @@ def explosion(selected):
 				
 		## store view
 		for group in cmd.get_names("objects"):
-			cmd.mview('store', object = group)	
+			cmd.mview('store', object = group)
+		cmd.zoom('all', complete = 1)
+		cmd.mview('store')
 			
 		f = f + frameNum
 		cmd.frame(f)
 		## store view again to show final explosion for some time
 		for group in cmd.get_names("objects"):
 			cmd.mview('store', object = group)	
-
+		cmd.zoom('all', complete = 1)
+		cmd.mview('store')
 		## delete state object
 		cmd.delete(selected + '_'+ s)	
 		
-
+	cmd.zoom('all', complete = 1)
 	print time.clock() - start_time, 'seconds'
 
 cmd.extend('explosion', explosion)
