@@ -1,9 +1,12 @@
 # run C:/Users/Figaschewski/Dropbox/Masterarbeit/Masterthesis/explosion_movie.py
 
 # ''' load complex from PDB'''
+# cmd.reinitialize()
 # selected = '3oaa'
 # pdbFile = selected + '.pdb1'
 # cmd.fetch(selected, type='pdb1')
+# util.cbc(selection= selected)
+# cmd.remove('solvent')
 # cmd.load('C:\Users\Figaschewski\Dropbox\Masterarbeit\TPC2_M484L_wActivator_56ns\TPC2_M484L_wActivator_56ns.pdb', 'test')
 
 '''
@@ -24,7 +27,35 @@ from pymol import stored ## import stored for passing data back and forth
 from pymol import util ## color by chain
 import get_colors ## get random colors
 import time
+from operator import itemgetter
 
+def get_ligands():
+	''' get all ligands (organic) from complex, return them as a set'''
+	stored.ligands = []
+
+	## create the original selection of all organic atoms 
+	cmd.select('allOrg', 'org')
+
+	##' temporary selection
+	cmd.select('temp', 'none')
+
+	## while initial selection is not empty, 'pop' from it and query the atom's 
+	## molecule's name
+	while cmd.count_atoms('allOrg') != 0:
+
+		## pop--peek, rather
+		cmd.select('temp', 'first allOrg')
+		
+		## store the residue name
+		cmd.iterate('temp', 'stored.ligands.append(resn)')
+		
+		## remove by molecule
+		cmd.select('allOrg', 'allOrg and not (bm. temp)')
+		
+	cmd.delete('allOrg')
+	cmd.delete('temp')
+
+	return set(stored.ligands)
 
 def translate_selection(originXYZ, transXYZ, transname, factor, f, group):
 	''' DESCRIPTION:
@@ -46,8 +77,6 @@ def translate_selection(originXYZ, transXYZ, transname, factor, f, group):
 	cmd.mview('store', object=group)
 	cmd.mview('interpolate', object=group)
 	
-	
-
 def calc_COM(transname):
 	'''DESCRIPTION:
 		calculate COM of an object 
@@ -61,7 +90,6 @@ def calc_COM(transname):
 
 	return pos
 		
-
 def isColliding(sel1, sel2):
 	''' DESCIPTION:
 		calculate if two bounding boxes are colliding
@@ -93,7 +121,6 @@ def isColliding(sel1, sel2):
 
 	return isColliding
 
-
 def calcTransFac(sele):
 	'''DESCRIPTION 
 		calculate translation factor 
@@ -103,6 +130,59 @@ def calcTransFac(sele):
 					 (protDim_max[1] - protDim_min[1]) ** 2 +
 					 (protDim_max[2] - protDim_min[2]) ** 2)/2
 	return transFac
+
+def label_obj(chainname, chainAndLabel = None):
+	'''create an label for given chain (if chainAndLabel set) or ligand  '''
+	dim = cmd.get_extent(chainname)
+	if not chainAndLabel:
+		ligName = chainname.split("_")[-1]
+	cmd.pseudoatom("_tmpPoint" + chainname, pos=dim[0])
+	# cmd.pseudoatom("_tmpPoint" + chainname, pos=dim[1])
+	if not chainAndLabel:
+		cmd.label("_tmpPoint" + chainname, "'%s'" %ligName)
+	else:
+		cmd.label("_tmpPoint" + chainname, "'%s'" %chainname)
+	if chainAndLabel:
+		chainAndLabel[chainname] = "_tmpPoint" + chainname
+	if not chainAndLabel:
+		cmd.mview('store', object = "_tmpPoint" + chainname)
+	cmd.hide('nonbonded', "_tmpPoint" + chainname)
+	if chainAndLabel:
+		return chainAndLabel
+	
+def initialize_movie(selected):
+	''' initial setup of a movie'''
+	cmd.set('matrix_mode', 1)
+	cmd.set('movie_panel', 1)
+	cmd.set('scene_buttons', 1)
+	cmd.set('cache_frames', 1)
+	cmd.config_mouse('three_button_motions', 1)
+	# cmd.set('movie_panel', 0)	## hide movie panel
+	cmd.set('movie_panel_row_height', 3)
+	
+	frameNum = 50
+	frames = str(160)
+	cmd.mset('1 x' + frames)
+	cmd.orient(selected)
+	
+def color_binding(chainname, ligandname):
+	''' color binding site '''
+	binding = 'byres (' + chainname + ' nto. 3 of ' + \
+				ligandname +')'
+	cmd.select('inter', binding)
+	cmd.color('red', 'inter')
+	cmd.delete('inter')
+	
+def store_view(obj = None, group = False, all = True):
+	''' store selected view '''
+	if group:
+		for group in cmd.get_names("objects"):
+					cmd.mview('store', object = group)
+	if all:
+		cmd.zoom('all', complete=1)
+	if obj:
+		cmd.mview('store', object = obj)
+	cmd.mview('store')
 	
 def explosion(selected, complex = None):
 	''' DESCRIPTION:
@@ -123,365 +203,422 @@ def explosion(selected, complex = None):
 	
 	##get chains of complex
 	chains = cmd.get_chains(selected)
-
-	''' get ligands'''
-	##get all ligands (organic) from complex'''
-	stored.ligands = []
-
-	## create the original selection of all organic atoms 
-	cmd.select('allOrg', 'org')
-
-	##' temporary selection
-	cmd.select('temp', 'none')
-
-	## while initial selection is not empty, 'pop' from it and query the atom's 
-	## molecule's name
-	while cmd.count_atoms('allOrg') != 0:
-
-		## pop--peek, rather
-		cmd.select('temp', 'first allOrg')
-		
-		## store the residue name
-		cmd.iterate('temp', 'stored.ligands.append(resn)')
-		
-		## remove by molecule
-		cmd.select('allOrg', 'allOrg and not (bm. temp)')
-		
-	cmd.delete('allOrg')
-	cmd.delete('temp')
 	
-	storedLigands = set(stored.ligands) 
+	for c in chains:
+		if c == "":
+			chains.remove(c)
 
-	'''initialize movie'''
-	cmd.set('matrix_mode', 1)
-	cmd.set('movie_panel', 1)
-	cmd.set('scene_buttons', 1)
-	cmd.set('cache_frames', 1)
-	cmd.config_mouse('three_button_motions', 1)
-	# cmd.set('movie_panel', 0)	## hide movie panel
-	cmd.set('movie_panel_row_height', 3)
-	
-	frameNum = 50
-	frames = str(160)
-	cmd.mset('1 x' + frames)
-	cmd.orient(selected)
+	## get ligands
+	storedLigands = get_ligands() 
+
+	## initialize movie
+	initialize_movie(selected)
 			
 	''' Explosion: for each state create an object of every chain and for 
 		related ligands. In this state calulate COM for state and according 
 		chains and translate chain along vector between COMs of state and chain. 
 		For every chain do the same with its ligands.
 	'''
-
-	## create models for all states of complex
-	states = cmd.split_states(selected)
-
-	com_num = ''
-	for state in range(1,cmd.count_states()+1):
-		## state = 0 would calculate the COM for all states at once
-		if state == 0: 
-			continue
-
-		## name chain object in this state
-		s = '00' + str(state)
-		if state < 10:
-			s = '0' + s
-			
-		## COM of state (all chains)
-		## if only some chains are selected and source complex is given,
-		## select source complex for COM calculation
-		if complex:
-			complexXYZ = calc_COM(complex)
-		else:
-			complexXYZ = calc_COM(selected + '_' + s)
-
-		## calculate COM for single chains in state
-		cNames = []
-		chainsCOMS = {}
 		
-		## COM for ligands
-		ligandsCOMS = {}
-		f = 1
-		
-		## list all chain and ligand pairs
-		chainAndLigand = {}
-		ligandAndChain = {}
-		chainAndLabel = {}
-		
-		## chain or complex shall be translated
-		stored.res=[]
-		cmd.iterate('(' + selected + ')',"stored.res.append(resn + resi)")
-		if len(set(stored.res)) > 1:
-			cmd.hide("(" + selected + ")")
-			for c in chains:	
-				## color each chain individually
-				if cmd.count_states() > 1:
-					cmd.color(get_colors.get_random_color(), selected + '_' + \
-								s + '& chain ' + c)
+	## COM of complex
+	## if only some chains are selected and source complex is given,
+	## select source complex for COM calculation
+	if complex:
+		complexXYZ = calc_COM(complex)
+	else:
+		complexXYZ = calc_COM(selected)
 
-				## create object for chain with name
-				chainname = selected + '_' + s + '_'+c
-				cNames.append(chainname)
-				origin = selected+'_'+s+ ' & chain '+c
-				cmd.extract(chainname, origin)
-				
-				## label chains
-				dim = cmd.get_extent(chainname)
-				cmd.pseudoatom("_tmpPoint" + chainname, pos=dim[0])
-				cmd.pseudoatom("_tmpPoint" + chainname, pos=dim[1])
-				cmd.label("_tmpPoint" + chainname, "'chain %s'" %c)
-				chainAndLabel[chainname] = "_tmpPoint" + chainname
-				
-				## store object for movie
-				cmd.frame(f)
-				cmd.show('sticks', chainname)
-				cmd.mview('store', object=chainname)
-				cmd.mview('store', object="_tmpPoint" + chainname)
-				
-				## calculate and save COM of chain
-				chainsCOMS[chainname] = calc_COM(chainname)	
-				
-				## create objects for ligands
-				if stored.ligands:
-					for l in storedLigands:
-					
-						## select ligand on chain	
-						selection = chainname + ' & resn ' + l
+	## calculate COM for single chains in state
+	cNames = []
+	chainsCOMS = {}
+	
+	## COM for ligands
+	ligandsCOMS = {}
+	f = 1
+	
+	## list all chain and ligand pairs
+	chainAndLigand = {}
+	ligandAndChain = {}
+	chainAndLabel = {}
+	
+	''' chain or complex shall be translated '''
+	stored.res=[]
+	## test if not only a single residue/ligand is selected
+	cmd.iterate('(' + selected + ')',"stored.res.append(resn + resi)")
+	if len(set(stored.res)) > 1:
+		cmd.hide("(" + selected + ")")
+		for c in chains:	
+			## color each chain individually
+			if cmd.count_states() > 1:
+				cmd.color(get_colors.get_random_color(), selected + \
+						'& chain ' + c) 
 						
-						## get pair of ligand and respective chain
-						if cmd.count_atoms(selection) > 0:
-							ligandname = chainname + '_' + l
-							cmd.extract(ligandname, selection)
-							stored.lig=[]
-							cmd.iterate('(' + selected + ')',
-											"stored.lig.append(resn + resi)")
-							ligres = str(list(set(stored.res))[0])
-							
-							
-							## label ligands			
-							dim = cmd.get_extent(ligandname)
-							ligName = ligandname.split("_")[-1]
-							cmd.pseudoatom("_tmpPoint" + ligandname, pos=dim[0])
-							cmd.label("_tmpPoint" + ligandname, "'%s'" %ligres)
-							cmd.mview('store', object = "_tmpPoint" + ligandname)
-							
-							## calculate COM of ligand
-							ligandsCOMS[ligandname] = calc_COM(ligandname)
-							
-							## color binding site
-							binding = 'byres (' + chainname + ' nto. 3 of ' + \
-										ligandname +')'
-							cmd.select('inter', binding)
-							cmd.color('red', 'inter')
-							cmd.delete('inter')
-							
-							## group chains and respective ligands to translate  
-							## them together at first (including their labels)
-							cmd.group(chainname + "_" + ligandname, 
-											chainname + " " + ligandname \
-											+ " " + "_tmpPoint" + chainname \
-											+ " " + "_tmpPoint" + ligandname)
-							chainAndLigand[chainname] = chainname + \
-															"_" + ligandname
-							ligandAndChain[ligandname] = chainname
-				
-				## if there is no ligand on chain, just keep chain and its label
-				if chainname not in chainAndLigand.keys():
-					cmd.group(chainname + "_", chainname + " and " + "_tmpPoint" 
-								+ chainname)
-			f = f + 10
-			cmd.frame(f)
-			## store chain objects for movie
-			for group in cmd.get_names("objects"):
-				cmd.mview('store', object = group) 
-			cmd.zoom('all', complete=1)
-			cmd.mview('store')
+			## create object for chain with name
+			chainname = 'chain' + c
+			cNames.append(chainname)
+			cmd.extract(chainname, selected+ ' & chain '+c)
 			
-			f = f + 10
-			## translate chains iteratively 
-			for chainname in cNames:
+			## label chains
+			chainAndLabel = label_obj(chainname, chainAndLabel)
+			
+			## store object for movie
+			cmd.frame(f)
+			cmd.show('sticks', chainname)
+			cmd.mview('store', object=chainname)
+			cmd.mview('store', object="_tmpPoint" + chainname)
+			
+			## calculate and save COM of chain
+			chainsCOMS[chainname] = calc_COM(chainname)	
+			
+			## create objects for ligands
+			if stored.ligands:
+				for l in storedLigands:
 				
-				## COM of chain
-				chainXYZ = chainsCOMS[chainname]
-
-				## only translate chain if there are multiple chains
-				if len(chains) > 1:	
-					## translate chains and ligands
-					for cname in cNames:
+					## select ligand on chain	
+					selection = chainname + ' & resn ' + l
 					
-						## check if current chain is colliding with any other chain
-						if cname != chainname:
-							while isColliding(chainname, cname):
-							
-								## if collision, translate all chains in selection
-								for cname in cNames:
-									cXYZ = chainsCOMS[cname]
-									
-									## if chain contains ligand, translate ligand also
-									if cname in chainAndLigand.keys():
-										translate_selection(complexXYZ, cXYZ, 
-												chainAndLigand[cname], transFac, f, 
-												chainAndLigand[cname])
-										continue
-									## only chain has to be translated
+					## get pair of ligand and respective chain
+					if cmd.count_atoms(selection) > 0:
+						ligandname = chainname + '_' + l
+						cmd.extract(ligandname, selection)
+						stored.lig=[]							
+						
+						## label ligands			
+						label_obj(ligandname)
+						
+						## calculate COM of ligand
+						ligandsCOMS[ligandname] = calc_COM(ligandname)
+						
+						## color binding site
+						color_binding(chainname, ligandname)
+						
+						## group chains and respective ligands to translate  
+						## them together at first (including their labels)
+						cmd.group(chainname + "_" + l + "_", 
+										chainname + " " + ligandname \
+										+ " " + "_tmpPoint" + chainname \
+										+ " " + "_tmpPoint" + ligandname)
+						chainAndLigand[chainname] = chainname + \
+														"_" + l + "_"
+						ligandAndChain[ligandname] = chainname
+			
+			## if there is no ligand on chain, just keep chain and its label
+			if chainname not in chainAndLigand.keys():
+				cmd.group(chainname + "_", chainname + " and " + "_tmpPoint" 
+							+ chainname)
+		f = f + 20
+		cmd.frame(f)
+		## store chain objects for movie 
+		store_view(group = True, all = True)
+		
+		f = f + 30
+		''' translate chains iteratively '''
+		for chainname in cNames:
+			
+			## COM of chain
+			chainXYZ = chainsCOMS[chainname]
+
+			## only translate chain if there are multiple chains
+			if len(chains) > 1:	
+				## translate chains and ligands
+				for cname in cNames:
+				
+					## check if current chain is colliding with any other chain
+					if cname != chainname:
+						while isColliding(chainname, cname):
+						
+							## if collision, translate all chains in selection
+							for cname in cNames:
+								cXYZ = chainsCOMS[cname]
+								
+								## if chain contains ligand, translate ligand also
+								if cname in chainAndLigand.keys():
 									translate_selection(complexXYZ, cXYZ, 
-											cname + "_", transFac,f, cname + "_")
-					cmd.orient(chainname)
-					cmd.zoom('all', complete=1)
-					cmd.mview('store', object = chainname + '_')
-					cmd.mview('store')
-											
-				## if only one chain is selected, translate it and its ligand
-				else:
-					cmd.frame(f)
-					cmd.orient(chainname)
-					cmd.zoom('all', complete=1)
-					cmd.mview('store', object = chainname + '_')
-					cmd.mview('store')
-					f = f + 10
-					cmd.frame(f)
-					cmd.orient(chainname)
-					cmd.zoom('all', complete=1)
-					cmd.mview('store', object = chainname + '_')
-					cmd.mview('store')
-					f = f + 30
-					cmd.frame(f)
-					
-					## if source complex is known use its COM to translate
-					if complex:
-						while isColliding(chainname, complex):
-							if chainname in chainAndLigand.keys():
-								translate_selection(complexXYZ, chainXYZ, 
-										chainAndLigand[chainname], transFac, f, 
-										chainAndLigand[chainname])
-							else:
-								translate_selection(complexXYZ, chainXYZ, 
-										chainname + "_", transFac, f, 
-										chainname + "_")
-					else:
-						if chainname in chainAndLigand.keys():
-								cmd.translate([transFac, transFac, transFac], 
-												object = chainAndLigand[chainname])
-						else:
-							cmd.translate([transFac, transFac, transFac], 
-												object = chainname + "_")
-												
-					cmd.orient(chainname)
-					cmd.zoom('all', complete=1)
-					cmd.mview('store', object = chainname + '_')
-					cmd.mview('store')
-							
-			
-			## store objects for movie
-			cmd.frame(f)
-			for group in cmd.get_names("objects"):
-				cmd.mview('store', object = group)
-			cmd.mview('store')
-			
-
-			f = f + frameNum/2
-			cmd.frame(f)
-			cmd.zoom('all', complete = 1 )
-			cmd.mview('store')
-			
-			## translate ligands
-			if storedLigands:
-				f = f + frameNum/2
+											chainAndLigand[cname], transFac, f, 
+											chainAndLigand[cname])
+									continue
+								## only chain has to be translated
+								translate_selection(complexXYZ, cXYZ, 
+										cname + "_", transFac,f, cname + "_")
+										
+				store_view(all = True)
+										
+			## if only one chain is selected, translate it and its ligand
+			else:
 				cmd.frame(f)
-				for ligand in ligandAndChain.keys():
-					cXYZ = chainsCOMS[ligandAndChain[ligand]]
-					ligandXYZ = ligandsCOMS[ligand]
-					
-					if complex:
-						condition = isColliding(ligand, complex) \
-									or isColliding(ligand, ligandAndChain[ligand])
+				cmd.orient(chainname)
+				store_view(chainname + '_', all = True)
+
+				f = f + 10
+				cmd.frame(f)
+				store_view(chainname + '_', all = True)
+				
+				f = f + 30
+				cmd.frame(f)
+				
+				## if source complex is known use its COM to translate
+				if complex:
+					while isColliding(chainname, complex):
+						if chainname in chainAndLigand.keys():
+							translate_selection(complexXYZ, chainXYZ, 
+									chainAndLigand[chainname], transFac, f, 
+									chainAndLigand[chainname])
+						else:
+							translate_selection(complexXYZ, chainXYZ, 
+									chainname + "_", transFac, f, 
+									chainname + "_")
+				else:
+					if chainname in chainAndLigand.keys():
+							cmd.translate([transFac, transFac, transFac], 
+											object = chainAndLigand[chainname])
 					else:
-						condition = isColliding(ligand, ligandAndChain[ligand])
-					if condition:
-						translate_selection(cXYZ, ligandXYZ, ligand, 
+						cmd.translate([transFac, transFac, transFac], 
+											object = chainname + "_")
+											
+				cmd.orient(chainname)
+				store_view(chainname + '_', all = True)
+						
+		
+		## store objects for movie
+		f = f + 30
+		cmd.frame(f)
+		store_view(group=True, all = True)
+		
+		''' translate ligands '''
+		if storedLigands:
+			f = f + 30
+			cmd.frame(f)
+			for ligand in ligandAndChain.keys():
+				cXYZ = chainsCOMS[ligandAndChain[ligand]]
+				ligandXYZ = ligandsCOMS[ligand]
+				
+				if complex:
+					condition = isColliding(ligand, complex) \
+								or isColliding(ligand, ligandAndChain[ligand])
+				else:
+					condition = isColliding(ligand, ligandAndChain[ligand])
+				if condition:
+					translate_selection(cXYZ, ligandXYZ, ligand, 
+										transFac/2, f, 
+										chainAndLigand[ligandAndChain[ligand]])
+					translate_selection(cXYZ, ligandXYZ, 
+											"_tmpPoint" + ligand, 
 											transFac/2, f, 
 											chainAndLigand[ligandAndChain[ligand]])
-						translate_selection(cXYZ, ligandXYZ, 
-												"_tmpPoint" + ligand, 
-												transFac/2, f, 
-												chainAndLigand[ligandAndChain[ligand]])
-						if complex:
-							condition = isColliding(ligand, complex) \
-									or isColliding(ligand, ligandAndChain[ligand])
-						else:
-							condition = isColliding(ligand, ligandAndChain[ligand])
+					if complex:
+						condition = isColliding(ligand, complex) \
+								or isColliding(ligand, ligandAndChain[ligand])
+					else:
+						condition = isColliding(ligand, ligandAndChain[ligand])
 
-				f = f + 10
-				cmd.frame(f)
-				## store view
-				for group in cmd.get_names("objects"):
-					cmd.mview('store', object = group)
-				cmd.zoom('all', complete = 1)
-				cmd.mview('store')
-					
-				f = f + 10
-				cmd.frame(f)
-			## store view again to show final explosion for some time
-			for group in cmd.get_names("objects"):
-				cmd.mview('store', object = group)	
-			cmd.zoom('all', complete = 1)
-			cmd.mview('store')
-			## delete state object
-			cmd.delete(selected + '_'+ s)	
-			
-
-		## translation of single ligand only
-		else: 
-			resis = str(list(set(stored.res))[0])
-			dim = cmd.get_extent(selected)
-			cmd.pseudoatom("_tmpPoint" + resis, pos=dim[1])
-			cmd.label("_tmpPoint" + resis, "'%s'" %resis)
-			cmd.group(resis + "_", selected + " and " + "_tmpPoint" + resis)
-			
-			cmd.delete(selected + '_' + s)
-			binding = 'byres (' + complex + ' nto. 3 of ' + \
-										selected +')'
-			cmd.select('_inter', binding)
-			cmd.color('red', '_inter')
-			
-			f = 1
-			cmd.frame(f)
-			cmd.zoom('all', complete = 1)
-			cmd.mview('store', object = resis + "_")
-			cmd.mview('store')
-			
 			f = f + 10
 			cmd.frame(f)
-			cmd.orient('_inter %s' %selected)
-			cmd.mview('store', object = resis + "_")
-			cmd.mview('store')
-			
+			store_view(group=True, all = True)
+				
 			f = f + 10
 			cmd.frame(f)
-			cmd.orient('_inter %s' %selected)
-			cmd.mview('store', object = resis + "_")
-			cmd.mview('store')
-			
-			f = f + frameNum
-			cmd.frame(f)
-			ligandXYZ = calc_COM(selected)
-			while isColliding(selected, complex):
-				translate_selection(complexXYZ, ligandXYZ, resis + "_", 
-										transFac*5, f, resis + "_")
-			cmd.zoom('_inter %s' %selected)
-			cmd.mview('store')
-			
-			f = f + frameNum
-			cmd.frame(f)
-			cmd.zoom('all', complete=1)
-			cmd.mview('store', object = resis + "_")
-			cmd.mview('store')
-			
+		## store view again to show final explosion for some time
+		store_view(group=True, all = True)
+
+		''' translation of single ligand or residue only '''
+	else: 
+		resis = str(list(set(stored.res))[0])
+		dim = cmd.get_extent(selected)
+		cmd.pseudoatom("_tmpPoint" + resis, pos=dim[1])
+		cmd.label("_tmpPoint" + resis, "'%s'" %resis)
+		cmd.hide('nonbonded', "_tmpPoint" + resis)
+		cmd.group(resis + "_", selected + " and " + "_tmpPoint" + resis)
+		
+		cmd.delete(selected + '_' + s)
+		binding = 'byres (' + complex + ' nto. 3 of ' + \
+									selected +')'
+		cmd.select('_inter', binding)
+		cmd.color('red', '_inter')
+		
+		f = 1
+		cmd.frame(f)
+		store_view(resis + "_", all = True)
+		
+		f = f + 10
+		cmd.frame(f)
+		cmd.orient('_inter %s' %selected)
+		store_view(resis + "_")
+		
+		f = f + 10
+		cmd.frame(f)
+		cmd.orient('_inter %s' %selected)
+		store_view(resis + "_")
+		
+		f = f + frameNum
+		cmd.frame(f)
+		ligandXYZ = calc_COM(selected)
+		while isColliding(selected, complex):
+			translate_selection(complexXYZ, ligandXYZ, resis + "_", 
+									transFac*5, f, resis + "_")
+		cmd.zoom('_inter %s' %selected)
+		cmd.mview('store')
+		
+		f = f + frameNum
+		cmd.frame(f)
+		cmd.orient('_inter %s' %selected)
+		store_view(resis + "_", all = True)
+		
 
 	cmd.frame(160)	
-	cmd.zoom('all', complete = 1)
-	cmd.mview('store')
+	store_view(all = True)
 		
 	print time.clock() - start_time, 'seconds'
 
+
+def canonical_explosion(selected):
+	'''initialize PyMOL'''
+	## case sensitive for chain ids
+	cmd.set('ignore_case', 'off') 
+
+	start_time = time.clock()
+
+	cmd.remove('solvent')
+	cmd.show('spheres', 'organic')
+	util.cbc(selection= selected)
+
+	cmd.orient(selected)
+	
+	'''get dimensions of structure to decide along which axes to translate'''
+	box1_min, box1_max = cmd.get_extent(selected)
+
+	x_axis = abs(box1_min[0] - box1_max[0])
+	y_axis = abs(box1_min[1] - box1_max[1])
+	z_axis = abs(box1_min[2] - box1_max[2])
+
+	axes = {"x_axis" : x_axis, "y_axis":y_axis, "z_axis":z_axis}
+	axes = sorted(axes.items(), key=itemgetter(1), reverse = True)
+
+	transFac = calcTransFac(selected)
+	transVec = [0,0,0]
+	if axes[0][0] == "x_axis" or axes[1][0] == "x_axis":
+		transVec[0] = transFac
+	if axes[0][0] == "y_axis" or axes[1][0] == "y_axis":
+		transVec[1] = transFac	
+	if axes[0][0] == "z_axis" or axes[1][0] == "z_axis":
+		transVec[2] = transFac
+
+	print transVec	
+	
+	## initialize movie
+	initialize_movie(selected)
+	f = 1
+	
+	''' get chains of complex '''
+	chains = cmd.get_chains(selected)
+
+	allChains = []
+	chainAndLabel = {}
+	for chain in chains:
+		## create an object for every chain 
+		chainname = "chain" + chain
+		allChains.append(chainname)
+		cmd.extract(chainname, selected + " & chain " + chain)
+		
+		## label chains
+		chainAndLabel = label_obj(chainname, chainAndLabel)
+		
+		## store object for movie
+		cmd.frame(f)
+		cmd.show('sticks', chainname)
+		cmd.mview('store', object=chainname)
+		cmd.mview('store', object="_tmpPoint" + chainname)
+		
+	cmd.zoom('all')
+	cmd.mview('store')
+
+	## get ligands'''
+	storedLigands = get_ligands()
+	
+			
+	chainAndLigand = {}
+	ligandAndChain = {}
+	## create objects for ligands
+	for chainname in allChains:
+		if stored.ligands:
+			for l in storedLigands:
+			
+				## select ligand on chain	
+				selection = chainname + ' & resn ' + l
+				
+				## get pair of ligand and respective chain
+				if cmd.count_atoms(selection) > 0:
+					ligandname = chainname + '_' + l
+					cmd.extract(ligandname, selection)
+					stored.lig=[]							
+					
+					## label ligands			
+					label_obj(ligandname)
+					
+					## color binding site
+					color_binding(chainname, ligandname)
+					
+					## group chains and respective ligands to translate  
+					## them together at first (including their labels)
+					cmd.group(chainname + "_", 
+									chainname + " " + ligandname \
+									+ " " + "_tmpPoint" + chainname \
+									+ " " + "_tmpPoint" + ligandname)
+					chainAndLigand[chainname] = ligandname
+					ligandAndChain[ligandname] = chainname
+					
+				else:
+					cmd.group(chainname + "_", 
+								chainname + " " + "_tmpPoint" + chainname)
+					
+	f = f + 20
+	cmd.frame(f)
+	## store chain objects for movie 
+	store_view(group = True, all = True)
+					
+	
+	''' translate chains'''
+	i = 1
+	f = f + 40
+	cmd.frame(f)
+	for chain in allChains:
+		for c in allChains:
+			if c != chain:
+				while isColliding(chain, c):
+					for ch in allChains[1:]:
+						cmd.translate( [x * i for x in transVec] , object=ch)
+						cmd.translate([x * i for x in transVec], object="_tmpPoint" + ch)
+						if ch in chainAndLigand.keys():
+							cmd.translate([x * i for x in transVec], object=chainAndLigand[ch])
+							cmd.translate([x * i for x in transVec], object="_tmpPoint" + chainAndLigand[ch])
+						cmd.mview('store', object = ch+"_")
+						cmd.mview('interpolate', object = ch+"_")
+						i = i + 1
+			else:
+				continue
+				
+	store_view(group = True, all = True)
+	
+	f = f + 20
+	cmd.frame(f)
+	store_view(group=True, all = True)
+		
+	''' translate ligands'''
+	f = f + 30
+	cmd.frame(f)
+	
+	for ligand in ligandAndChain.keys():
+		while isColliding(ligand, ligandAndChain[ligand]):
+			cmd.translate([x * 1/4  for x in transVec], object=ligand)
+			cmd.translate([x * 1/4 for x in transVec], object="_tmpPoint" + ligand)
+	store_view(group = True, all = True)
+
+	f = f + 20
+	cmd.frame(f)
+	store_view(group=True, all = True)
+	
+	cmd.zoom('all', complete=1)					
+	print time.clock() - start_time, 'seconds'
+
+
 cmd.extend('explosion', explosion)
-cmd.extend('isColliding', isColliding)
+cmd.extend('canonical_explosion', canonical_explosion)	
