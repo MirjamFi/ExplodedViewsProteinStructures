@@ -12,12 +12,17 @@
 '''
 	Create an movie of an exploded view for a given protein structure (PDB) or 
 	parts of it.
-	You can select single or multiple chains, a residue or ligand to be exploded, 
+	If you use explosion() it will explode parts alon a vector of the center of
+	mass of the original complex and the COM of the selection. Here, xou can 
+	select single or multiple chains, a residue or ligand to be exploded, 
 	just extract them into one object from source structure. If chains contain 
 	ligands, those 	will also be exploded.
 	To explod specific chains/residue/ligand it is useful to also give the 
 	complex for explosion directon, espacially for single chain, so the chain is 
 	not	translated into the complex.
+	If you use canonical_explosion() the parts of the selection will be 
+	translated in the same direction. You can select the whole complex or single/
+	multiple chains.
 	Exploded parts will be labeled.
 '''
 from pymol import cmd 
@@ -30,7 +35,8 @@ import time
 from operator import itemgetter
 
 def get_ligands():
-	''' get all ligands (organic) from complex, return them as a set'''
+	''' DESCRIPTION:
+		get all ligands (organic) from complex, return them as a set'''
 	stored.ligands = []
 
 	## create the original selection of all organic atoms 
@@ -79,7 +85,7 @@ def translate_selection(originXYZ, transXYZ, transname, factor, f, group):
 	
 def calc_COM(transname):
 	'''DESCRIPTION:
-		calculate COM of an object 
+		calculate CenterOfMass of an object 
 	'''
 	cenma.com(transname, state = 1)
 	cmd.zoom(transname + '_COM')
@@ -91,7 +97,7 @@ def calc_COM(transname):
 	return pos
 		
 def isColliding(sel1, sel2):
-	''' DESCIPTION:
+	''' DESCRIPTION:
 		calculate if two bounding boxes are colliding
 	'''
 	box1_min, box1_max = cmd.get_extent(sel1)
@@ -113,7 +119,8 @@ def isColliding(sel1, sel2):
 	y_max2 = box2_max[1]
 	z_max2 = box2_max[2]
 	
-	## test if any of the vertices of box 1 are in any of the faces of box 2 and vice versa
+	## test if any of the vertices of box 1 are in any of the faces of box 2 
+	## and vice versa
 	isColliding = 	(x_min1 <= x_max2 and x_max1 >= x_min2) and \
 					(y_min1 <= y_max2 and y_max1 >= y_min2) and \
 					(z_min1 <= z_max2 and z_max1 >= z_min2)
@@ -123,7 +130,7 @@ def isColliding(sel1, sel2):
 
 def calcTransFac(sele):
 	'''DESCRIPTION 
-		calculate translation factor 
+		calculate translation factor according to size of selection
 	'''
 	protDim_min, protDim_max = cmd.get_extent(sele)
 	transFac = math.sqrt((protDim_max[0] - protDim_min[0]) ** 2 +
@@ -132,7 +139,8 @@ def calcTransFac(sele):
 	return transFac
 
 def label_obj(chainname, chainAndLabel = None):
-	'''create an label for given chain (if chainAndLabel set) or ligand  '''
+	'''DESCRIPTION:
+		create an label for given chain (if chainAndLabel set) or ligand  '''
 	dim = cmd.get_extent(chainname)
 	if not chainAndLabel:
 		ligName = chainname.split("_")[-1]
@@ -151,7 +159,8 @@ def label_obj(chainname, chainAndLabel = None):
 		return chainAndLabel
 	
 def initialize_movie(selected):
-	''' initial setup of a movie'''
+	''' DESCRIPTION: 
+		initial setup of a movie'''
 	cmd.set('matrix_mode', 1)
 	cmd.set('movie_panel', 1)
 	cmd.set('scene_buttons', 1)
@@ -165,16 +174,19 @@ def initialize_movie(selected):
 	cmd.mset('1 x' + frames)
 	cmd.orient(selected)
 	
-def color_binding(chainname, ligandname):
-	''' color binding site '''
+def color_binding(chainname, ligandname, res = False):
+	''' DESCRIPTION:
+		color binding site '''
 	binding = 'byres (' + chainname + ' nto. 3 of ' + \
 				ligandname +')'
-	cmd.select('inter', binding)
-	cmd.color('red', 'inter')
-	cmd.delete('inter')
+	cmd.select('_inter', binding)
+	cmd.color('red', '_inter')
+	if not res:
+		cmd.delete('_inter')
 	
 def store_view(obj = None, group = False, all = True):
-	''' store selected view '''
+	''' DESCRIPTION:
+		store selected view '''
 	if group:
 		for group in cmd.get_names("objects"):
 					cmd.mview('store', object = group)
@@ -183,10 +195,60 @@ def store_view(obj = None, group = False, all = True):
 	if obj:
 		cmd.mview('store', object = obj)
 	cmd.mview('store')
-	
-def explosion(selected, complex = None):
+
+def get_ligand_chain_pair(l, selection, chainname, chainAndLigand, 
+							ligandAndChain, ligandsCOMS = None, COM = False):
+	'''DESCRIPTION:
+		get pair of ligand and respective chain''' 
+	if cmd.count_atoms(selection) > 0:
+		ligandname = chainname + '_' + l
+		cmd.extract(ligandname, selection)							
+		
+		## label ligands			
+		label_obj(ligandname)
+		
+		if COM:
+			## calculate COM of ligand
+			ligandsCOMS[ligandname] = calc_COM(ligandname)
+		
+		## color binding site
+		color_binding(chainname, ligandname)
+		
+		## group chains and respective ligands to translate  
+		## them together at first (including their labels)
+		if COM:
+			cmd.group(chainname + "_" + l + "_", 
+							chainname + " " + ligandname \
+							+ " " + "_tmpPoint" + chainname \
+							+ " " + "_tmpPoint" + ligandname)
+			chainAndLigand[chainname] = chainname + \
+											"_" + l + "_"
+		else:
+			## group chains and respective ligands to translate  
+			## them together at first (including their labels)
+			cmd.group(chainname + "_", 
+							chainname + " " + ligandname \
+							+ " " + "_tmpPoint" + chainname \
+							+ " " + "_tmpPoint" + ligandname)
+			chainAndLigand[chainname] = ligandname
+			
+		ligandAndChain[ligandname] = chainname  
+			
+def store_res_view(selected, f, resis = None, orient = False, all = False):
+	cmd.frame(f)
+	if orient:
+		cmd.orient('_inter %s' %selected)
+	if resis:
+		store_view(resis + "_", all)
+	if not resis:
+		if all:
+			store_view(selected, all)
+
+
+def com_explosion(selected, complex = None):
 	''' DESCRIPTION:
-		create a movie for an exploded view of given protein
+		create a movie for an exploded view of given protein. Explosion along
+		vector of complex' COM and selection's COM.
 	'''
 	'''setup of selected sturcture'''
 	start_time = time.clock()
@@ -204,9 +266,9 @@ def explosion(selected, complex = None):
 	##get chains of complex
 	chains = cmd.get_chains(selected)
 	
-	for c in chains:
-		if c == "":
-			chains.remove(c)
+	# for c in chains:
+		# if c == "":
+			# chains.remove(c)
 
 	## get ligands
 	storedLigands = get_ligands() 
@@ -214,10 +276,10 @@ def explosion(selected, complex = None):
 	## initialize movie
 	initialize_movie(selected)
 			
-	''' Explosion: for each state create an object of every chain and for 
-		related ligands. In this state calulate COM for state and according 
-		chains and translate chain along vector between COMs of state and chain. 
-		For every chain do the same with its ligands.
+	''' Explosion: Create an object of every chain and for related ligands. 
+				Calulate COM for complex and according chains and 
+				translate chain along vector between COMs of complex and chain. 
+				For every chain do the same with its ligands.
 	'''
 		
 	## COM of complex
@@ -277,30 +339,9 @@ def explosion(selected, complex = None):
 					## select ligand on chain	
 					selection = chainname + ' & resn ' + l
 					
-					## get pair of ligand and respective chain
-					if cmd.count_atoms(selection) > 0:
-						ligandname = chainname + '_' + l
-						cmd.extract(ligandname, selection)
-						stored.lig=[]							
-						
-						## label ligands			
-						label_obj(ligandname)
-						
-						## calculate COM of ligand
-						ligandsCOMS[ligandname] = calc_COM(ligandname)
-						
-						## color binding site
-						color_binding(chainname, ligandname)
-						
-						## group chains and respective ligands to translate  
-						## them together at first (including their labels)
-						cmd.group(chainname + "_" + l + "_", 
-										chainname + " " + ligandname \
-										+ " " + "_tmpPoint" + chainname \
-										+ " " + "_tmpPoint" + ligandname)
-						chainAndLigand[chainname] = chainname + \
-														"_" + l + "_"
-						ligandAndChain[ligandname] = chainname
+					get_ligand_chain_pair(l, selection, chainname, 
+											chainAndLigand, ligandAndChain, 
+											ligandsCOMS, COM = True)
 			
 			## if there is no ligand on chain, just keep chain and its label
 			if chainname not in chainAndLigand.keys():
@@ -388,6 +429,7 @@ def explosion(selected, complex = None):
 		if storedLigands:
 			f = f + 30
 			cmd.frame(f)
+
 			for ligand in ligandAndChain.keys():
 				cXYZ = chainsCOMS[ligandAndChain[ligand]]
 				ligandXYZ = ligandsCOMS[ligand]
@@ -417,11 +459,13 @@ def explosion(selected, complex = None):
 				
 			f = f + 10
 			cmd.frame(f)
+			
 		## store view again to show final explosion for some time
 		store_view(group=True, all = True)
 
 		''' translation of single ligand or residue only '''
 	else: 
+		## label residue
 		resis = str(list(set(stored.res))[0])
 		dim = cmd.get_extent(selected)
 		cmd.pseudoatom("_tmpPoint" + resis, pos=dim[1])
@@ -429,39 +473,24 @@ def explosion(selected, complex = None):
 		cmd.hide('nonbonded', "_tmpPoint" + resis)
 		cmd.group(resis + "_", selected + " and " + "_tmpPoint" + resis)
 		
-		cmd.delete(selected + '_' + s)
-		binding = 'byres (' + complex + ' nto. 3 of ' + \
-									selected +')'
-		cmd.select('_inter', binding)
-		cmd.color('red', '_inter')
+		color_binding(complex, selected, res = True)
 		
-		f = 1
-		cmd.frame(f)
-		store_view(resis + "_", all = True)
+		store_res_view(selected, 1, resis, all = True)
+
+		store_res_view(selected, 10, resis, orient = True)
+
+		store_res_view(selected, 20,resis)
 		
-		f = f + 10
-		cmd.frame(f)
-		cmd.orient('_inter %s' %selected)
-		store_view(resis + "_")
-		
-		f = f + 10
-		cmd.frame(f)
-		cmd.orient('_inter %s' %selected)
-		store_view(resis + "_")
-		
-		f = f + frameNum
-		cmd.frame(f)
+		## translate residue
+		cmd.frame(50)
 		ligandXYZ = calc_COM(selected)
 		while isColliding(selected, complex):
 			translate_selection(complexXYZ, ligandXYZ, resis + "_", 
-									transFac*5, f, resis + "_")
-		cmd.zoom('_inter %s' %selected)
+									transFac*5, 50, resis + "_")
+		cmd.zoom('_inter %s_' %resis)
 		cmd.mview('store')
 		
-		f = f + frameNum
-		cmd.frame(f)
-		cmd.orient('_inter %s' %selected)
-		store_view(resis + "_", all = True)
+		store_res_view(selected, 80)
 		
 
 	cmd.frame(160)	
@@ -469,8 +498,10 @@ def explosion(selected, complex = None):
 		
 	print time.clock() - start_time, 'seconds'
 
-
 def canonical_explosion(selected):
+	'''DESCRIPTION: translate a selection in canonical direction and create
+		a movie from it'''
+		
 	'''initialize PyMOL'''
 	## case sensitive for chain ids
 	cmd.set('ignore_case', 'off') 
@@ -508,7 +539,7 @@ def canonical_explosion(selected):
 	initialize_movie(selected)
 	f = 1
 	
-	''' get chains of complex '''
+	''' get chains and ligands of complex '''
 	chains = cmd.get_chains(selected)
 
 	allChains = []
@@ -545,30 +576,12 @@ def canonical_explosion(selected):
 				## select ligand on chain	
 				selection = chainname + ' & resn ' + l
 				
-				## get pair of ligand and respective chain
-				if cmd.count_atoms(selection) > 0:
-					ligandname = chainname + '_' + l
-					cmd.extract(ligandname, selection)
-					stored.lig=[]							
+				get_ligand_chain_pair(l, selection, chainname, chainAndLigand, 
+										ligandAndChain, COM = False)
 					
-					## label ligands			
-					label_obj(ligandname)
-					
-					## color binding site
-					color_binding(chainname, ligandname)
-					
-					## group chains and respective ligands to translate  
-					## them together at first (including their labels)
-					cmd.group(chainname + "_", 
-									chainname + " " + ligandname \
-									+ " " + "_tmpPoint" + chainname \
-									+ " " + "_tmpPoint" + ligandname)
-					chainAndLigand[chainname] = ligandname
-					ligandAndChain[ligandname] = chainname
-					
-				else:
-					cmd.group(chainname + "_", 
-								chainname + " " + "_tmpPoint" + chainname)
+		if chainname not in chainAndLigand.keys():
+			cmd.group(chainname + "_", 
+						chainname + " " + "_tmpPoint" + chainname)
 					
 	f = f + 20
 	cmd.frame(f)
@@ -586,10 +599,14 @@ def canonical_explosion(selected):
 				while isColliding(chain, c):
 					for ch in allChains[1:]:
 						cmd.translate( [x * i for x in transVec] , object=ch)
-						cmd.translate([x * i for x in transVec], object="_tmpPoint" + ch)
+						cmd.translate([x * i for x in transVec], 
+										object="_tmpPoint" + ch)
 						if ch in chainAndLigand.keys():
-							cmd.translate([x * i for x in transVec], object=chainAndLigand[ch])
-							cmd.translate([x * i for x in transVec], object="_tmpPoint" + chainAndLigand[ch])
+							cmd.translate([x * i for x in transVec], 
+											object=chainAndLigand[ch])
+							cmd.translate([x * i for x in transVec], 
+											object="_tmpPoint" + \
+											chainAndLigand[ch])
 						cmd.mview('store', object = ch+"_")
 						cmd.mview('interpolate', object = ch+"_")
 						i = i + 1
@@ -609,7 +626,8 @@ def canonical_explosion(selected):
 	for ligand in ligandAndChain.keys():
 		while isColliding(ligand, ligandAndChain[ligand]):
 			cmd.translate([x * 1/4  for x in transVec], object=ligand)
-			cmd.translate([x * 1/4 for x in transVec], object="_tmpPoint" + ligand)
+			cmd.translate([x * 1/4 for x in transVec], 
+							object="_tmpPoint" + ligand)
 	store_view(group = True, all = True)
 
 	f = f + 20
@@ -618,7 +636,6 @@ def canonical_explosion(selected):
 	
 	cmd.zoom('all', complete=1)					
 	print time.clock() - start_time, 'seconds'
-
-
-cmd.extend('explosion', explosion)
+	
+cmd.extend('com_explosion', com_explosion)
 cmd.extend('canonical_explosion', canonical_explosion)	
