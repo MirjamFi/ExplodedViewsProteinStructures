@@ -26,23 +26,6 @@ def calc_COM(transname):
 	cmd.mview('store')
 
 	return pos
-	
-def translate_selection(originXYZ, transXYZ, transname, factor):
-	''' DESCRIPTION:
-		translate an object relative to complex of origin using center of mass
-	'''
-	## vector between COMs to translate chain
-	dist=math.sqrt((transXYZ[0]-originXYZ[0])**2 +
-					(transXYZ[1]-originXYZ[1])**2 +
-					(transXYZ[2]-originXYZ[2])**2)
-
-	vector=((transXYZ[0]-originXYZ[0])/dist, 
-			(transXYZ[1]-originXYZ[1])/dist, 
-			(transXYZ[2]-originXYZ[2])/dist)
-	trans_vec = [x * -1.5 * factor for x in vector] 
-
-	## translate chain with vector
-	cmd.translate(trans_vec, transname, camera=0)
 
 def calcTransFac(sele):
 	'''DESCRIPTION 
@@ -185,6 +168,7 @@ for p in orderedPopc:
 	cmd.zoom('all', complete=1)
 	cmd.mview('store')
 	cmd.create(p+'_', 'resn POPC and resi '+ p)
+	cmd.show_as('mesh', p+'_')
 	cmd.group('POPC', p+'_', 'add')
 	cmd.mview('store', object = p+'_')
 	a = 'name O9 and resn POPC and resi ' + p 
