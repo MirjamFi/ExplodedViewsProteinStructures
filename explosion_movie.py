@@ -10,17 +10,24 @@
 # extract ABCDEF, chain A chain B chain C chain D chain E chain F
 # extract GH, chain G chain H
 # explosion(['ABCDEF','GH'])
-# cmd.load('C:\Users\Figaschewski\Dropbox\Masterarbeit\TPC2_M484L_wActivator_56ns\TPC2_M484L_wActivator_56ns.pdb', 'test')
+
+# cmd.set('ignore_case', 'off')
+# fetch 3oaa
+# run C:/Users/Figaschewski/Dropbox/Masterarbeit/Masterthesis/explosion_movie.py
+# create mol1, chain A chain B chain  C chain D chain  E chain F chain G chain  H
+# create mol2, chain I chain J chain  K chain L chain  M chain N chain O chain  P
+# create mol3, chain Q chain R chain  S chain T chain  U chain V chain W chain  X
+# explosion(['mol1', 'mol2', 'mol3'])
 
 '''
-	Create an movie of an exploded view for a given protein structure (PDB) or 
+	Create a movie of an exploded view for a given protein structure (PDB) or 
 	parts of it.
-	If you use explosion() it will explode parts alon a vector of the center of
-	mass of the original complex and the COM of the selection. Here, xou can 
+	If you use explosion() it will explode parts along a vector of the center of
+	mass of the original complex and the COM of the selection. Here, you can 
 	select single or multiple chains, a residue or ligand to be exploded, 
 	just extract them into one object from source structure. If chains contain 
 	ligands, those 	will also be exploded.
-	To explod specific chains/residue/ligand it is useful to also give the 
+	To explode specific chains/residue/ligand it is useful to also give the 
 	complex for explosion directon, espacially for single chain, so the chain is 
 	not	translated into the complex.
 	If you use canonical_explosion() the parts of the selection will be 
@@ -131,7 +138,6 @@ def isColliding(sel1, sel2):
 	isColliding = 	(x_min1 <= x_max2 and x_max1 >= x_min2) and \
 					(y_min1 <= y_max2 and y_max1 >= y_min2) and \
 					(z_min1 <= z_max2 and z_max1 >= z_min2)
-	
 
 	return isColliding
 
@@ -186,7 +192,7 @@ def initialize_movie(selected = None, frames = "100"):
 	cmd.set('cache_frames', 1)
 	cmd.config_mouse('three_button_motions', 1)
 	# cmd.set('movie_panel', 0)	## hide movie panel
-	cmd.set('movie_panel_row_height', 3)
+	cmd.set('movie_panel_row_height', 0.9)
 	
 	cmd.mset('1 x' + frames)
 	if selected:
@@ -276,7 +282,7 @@ def store_res_view(selected, f, resis = None, orient = False, all = False):
 		if all:
 			store_view(selected, all)
 
-def create_objects(chains, selected, storedLigands):
+def create_objects(chains, selected, storedLigands, chainAndLigand = None, typeOfExplosion = 'com'):
 
 	## names of chains
 	cNames = []
@@ -285,7 +291,8 @@ def create_objects(chains, selected, storedLigands):
 	chainAndLabel = {}
 	
 	## chains and according ligands
-	chainAndLigand = {}
+	if not chainAndLigand:
+		chainAndLigand = {}
 	
 	## ligands and according chains
 	ligandAndChain={}
@@ -315,7 +322,8 @@ def create_objects(chains, selected, storedLigands):
 		cmd.mview('store', object="_label" + chainname)
 		
 		## calculate and save COM of chain
-		chainsCOMS[chainname] = calc_COM(chainname)
+		if typeOfExplosion == 'com':
+			chainsCOMS[chainname] = calc_COM(chainname)
 	
 		## create objects for ligands
 		if storedLigands:
@@ -324,9 +332,13 @@ def create_objects(chains, selected, storedLigands):
 				## select ligand on chain	
 				selection = chainname + ' & resn ' + l
 				
-				get_ligand_chain_pair(l, selection, chainname, 
+				if typeOfExplosion == 'com':
+					get_ligand_chain_pair(l, selection, chainname, 
 										chainAndLigand, ligandAndChain, 
 										ligandsCOMS, COM = True)
+				else: 
+					get_ligand_chain_pair(l, selection, chainname, 
+										chainAndLigand, ligandAndChain)
 		
 		## if there is no ligand on chain, just keep chain and its label
 		if chainname not in chainAndLigand.keys():
@@ -337,7 +349,70 @@ def create_objects(chains, selected, storedLigands):
 	## store chain objects for movie 
 	store_view(group = True, all = True)
 	
-	return cNames, chainAndLabel, chainAndLigand, ligandAndChain, ligandsCOMS, chainsCOMS, f
+	if typeOfExplosion == 'com':
+		return cNames, chainAndLabel, chainAndLigand, ligandAndChain, ligandsCOMS, chainsCOMS, f
+	else:
+		return cNames, chainAndLabel, chainAndLigand, ligandAndChain, f
+	
+def transAxes(selected):
+	'''DESCRIPTION:
+		get dimensions of structure to decide along which axes to translate
+	'''
+	box1_min, box1_max = cmd.get_extent(selected)
+
+	x_axis = abs(box1_min[0] - box1_max[0])
+	y_axis = abs(box1_min[1] - box1_max[1])
+	z_axis = abs(box1_min[2] - box1_max[2])
+
+	axes = {"x_axis" : x_axis, "y_axis":y_axis, "z_axis":z_axis}
+	axes = sorted(axes.items(), key=itemgetter(1), reverse = True)
+
+	transFac = calcTransFac(selected)
+	transVec = [0,0,0]
+	if axes[0][0] == "x_axis" or axes[1][0] == "x_axis":
+		transVec[0] = transFac
+	if axes[0][0] == "y_axis" or axes[1][0] == "y_axis":
+		transVec[1] = transFac	
+	if axes[0][0] == "z_axis" or axes[1][0] == "z_axis":
+		transVec[2] = transFac
+		
+	return transVec
+
+def canonical_tranlation(ch, i, transVec, chainAndLigand):
+	'''DESCRIPTION:
+		translate chain ch canonical
+	'''
+	cmd.translate( [x * i for x in transVec] , object=ch)
+	cmd.translate([x * i for x in transVec], 
+					object="_label" + ch)
+	if ch in chainAndLigand.keys():
+		cmd.translate([x * i for x in transVec], 
+						object=chainAndLigand[ch])
+		cmd.translate([x * i for x in transVec], 
+						object="_label" + \
+						chainAndLigand[ch])
+	cmd.mview('store', object = ch+"_")
+	cmd.mview('interpolate', object = ch+"_")
+	
+def com_translation(cname, chainAndLigand, complexXYZ, chainXYZ, transFac, f):
+	'''DESCRIPTION:
+		translate chain via COM
+	'''		
+	## if chain contains ligand, translate ligand also
+	if cname in chainAndLigand.keys():
+		translate_selection(complexXYZ, chainXYZ, 
+				chainAndLigand[cname], transFac, f, 
+				chainAndLigand[cname])
+	## only chain has to be translated
+	else:
+		translate_selection(complexXYZ, chainXYZ, 
+			cname + "_", transFac,f, cname + "_")
+				
+def create_complex(chains, obj):
+	sel = ''
+	for ch in chains[obj]:
+		sel = sel + 'chain' + ch + ' '
+	cmd.select('_sel' + obj, sel)
 	
 def com_explosion(selected, cNames = None, chainAndLabel = None, 
 					chainAndLigand = None, ligandAndChain = None, 
@@ -348,20 +423,13 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 		create a movie for an exploded view of given protein. Explosion along
 		vector of complex' COM and selection's COM.
 	'''
-	
-	
 	start_time = time.clock()
-	
 
-	
-	
-	
 	## calculate translation factor which is the size of the selection
 	if single:
 		transFac = calcTransFac(selected)
 	
 	f = frame 
-	
 	
 	if single:
 		##get chains of complex
@@ -409,16 +477,7 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 						## if collision, translate all chains in selection
 						for cname in cNames:
 							cXYZ = chainsCOMS[cname]
-							
-							## if chain contains ligand, translate ligand also
-							if cname in chainAndLigand.keys():
-								translate_selection(complexXYZ, cXYZ, 
-										chainAndLigand[cname], transFac, f, 
-										chainAndLigand[cname])
-								continue
-							## only chain has to be translated
-							translate_selection(complexXYZ, cXYZ, 
-									cname + "_", transFac,f, cname + "_")
+							com_translation(cname, chainAndLigand, complexXYZ, cXYZ, transFac, f)
 									
 			store_view(all = True)
 									
@@ -438,14 +497,7 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 			## if source complex is known use its COM to translate
 			if complex:
 				while isColliding(chainname, complex):
-					if chainname in chainAndLigand.keys():
-						translate_selection(complexXYZ, chainXYZ, 
-								chainAndLigand[chainname], transFac, f, 
-								chainAndLigand[chainname])
-					else:
-						translate_selection(complexXYZ, chainXYZ, 
-								chainname + "_", transFac, f, 
-								chainname + "_")
+					com_translation(chainname, chainAndLigand, complexXYZ, chainXYZ, transFac, f)
 			else:
 				if chainname in chainAndLigand.keys():
 						cmd.translate([transFac, transFac, transFac], 
@@ -481,7 +533,7 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 				if single:
 					transFac = transFac/2
 				else:
-					transFac = transFac*2
+					transFac = transFac
 				translate_selection(cXYZ, ligandXYZ, ligand, 
 									transFac, f, 
 									chainAndLigand[ligandAndChain[ligand]])
@@ -505,123 +557,50 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 	## store view again to show final explosion for some time
 	store_view(group=True, all = True)
 		
-	print time.clock() - start_time, 'seconds'
+	print 'Explosion of', selected, time.clock() - start_time, 'seconds'
 	return f
 
-def canonical_explosion(selected, frame = 1):
+def canonical_explosion(selected, cNames = None, chainAndLabel = None, 
+					chainAndLigand = None, ligandAndChain = None, complex = None,
+					storedLigands = None, transVec = None, frame = 1, 
+					single = True):
 	'''DESCRIPTION: translate a selection in canonical direction and create
 		a movie from it'''
-		
-	'''initialize PyMOL'''
-	## case sensitive for chain ids
-	cmd.set('ignore_case', 'off') 
-
 	start_time = time.clock()
-
-	cmd.remove('solvent')
-	cmd.show('spheres', 'organic')
-	util.cbc(selection= selected)
-
 	cmd.orient(selected)
 	
-	'''get dimensions of structure to decide along which axes to translate'''
-	box1_min, box1_max = cmd.get_extent(selected)
-
-	x_axis = abs(box1_min[0] - box1_max[0])
-	y_axis = abs(box1_min[1] - box1_max[1])
-	z_axis = abs(box1_min[2] - box1_max[2])
-
-	axes = {"x_axis" : x_axis, "y_axis":y_axis, "z_axis":z_axis}
-	axes = sorted(axes.items(), key=itemgetter(1), reverse = True)
-
-	transFac = calcTransFac(selected)
-	transVec = [0,0,0]
-	if axes[0][0] == "x_axis" or axes[1][0] == "x_axis":
-		transVec[0] = transFac
-	if axes[0][0] == "y_axis" or axes[1][0] == "y_axis":
-		transVec[1] = transFac	
-	if axes[0][0] == "z_axis" or axes[1][0] == "z_axis":
-		transVec[2] = transFac
-
-	print transVec	
+	## calculate along which axes to translate
+	if single:
+		transVec = transAxes(selected)
+		print transVec	
 	
-	## initialize movie
-	initialize_movie(selected)
 	f = frame
 	
-	''' get chains and ligands of complex '''
-	chains = cmd.get_chains(selected)
-	
-	allChains = []
-	chainAndLabel = {}
-	for chain in chains:
-		## create an object for every chain 
-		chainname = "chain" + chain
-		allChains.append(chainname)
-		cmd.extract(chainname, selected + " & chain " + chain)
-		
-		## label chains
-		chainAndLabel = label_obj(chainname, chainAndLabel)
-		
-		## store object for movie
-		cmd.frame(f)
-		cmd.show('sticks', chainname)
-		cmd.mview('store', object=chainname)
-		cmd.mview('store', object="_label" + chainname)
-		
-	cmd.zoom('all')
-	cmd.mview('store')
+	if single:
+		## get chains and ligands of complex '''
+		chains = cmd.get_chains(selected)
 
-	## get ligands'''
-	storedLigands = get_ligands()
+		## get ligands'''
+		storedLigands = get_ligands()
 	
-			
-	chainAndLigand = {}
-	ligandAndChain = {}
-	## create objects for ligands
-	for chainname in allChains:
-		if stored.ligands:
-			for l in storedLigands:
-			
-				## select ligand on chain	
-				selection = chainname + ' & resn ' + l
+		cNames, chainAndLabel, chainAndLigand, ligandAndChain, f = \
+				create_objects(chains, selected, storedLigands, \
+							chainAndLigand = None, typeOfExplosion = 'canonical')
 				
-				get_ligand_chain_pair(l, selection, chainname, chainAndLigand, 
-										ligandAndChain, COM = False)
-					
-		if chainname not in chainAndLigand.keys():
-			cmd.group(chainname + "_", 
-						chainname + " " + "_label" + chainname)
-					
-	f = f + 20
-	cmd.frame(f)
-	## store chain objects for movie 
-	store_view(group = True, all = True)
-					
-	
+		f = f + 20
+		cmd.frame(f)
+		store_view(group = True, all = True)
 	''' translate chains'''
 	i = 1
-	f = f + 30
+	f = f + 20
 	cmd.frame(f)
-	for chain in allChains:
-		for c in allChains:
+	for chain in cNames:
+		for c in cNames:
 			if c != chain:
 				while isColliding(chain, c):
-					for ch in allChains[1:]:
-						cmd.translate( [x * i for x in transVec] , object=ch)
-						cmd.translate([x * i for x in transVec], 
-										object="_label" + ch)
-						if ch in chainAndLigand.keys():
-							cmd.translate([x * i for x in transVec], 
-											object=chainAndLigand[ch])
-							cmd.translate([x * i for x in transVec], 
-											object="_label" + \
-											chainAndLigand[ch])
-						cmd.mview('store', object = ch+"_")
-						cmd.mview('interpolate', object = ch+"_")
-						i = i + 1
-			else:
-				continue
+					for ch in cNames[1:]:
+						canonical_tranlation(ch, i, transVec, chainAndLigand)
+						i += 1
 				
 	store_view(group = True, all = True)
 	
@@ -649,6 +628,7 @@ def canonical_explosion(selected, frame = 1):
 	
 	cmd.zoom('all', complete=1)					
 	print time.clock() - start_time, 'seconds'
+	return f
 	
 def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 	'''DESCRIPTION:
@@ -665,7 +645,6 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 		print "Please give a list of selected objects (or just one) to translate."
 		exit() 
 		
-		
 	'''setup of selected sturcture'''
 	## case sensitive for chain ids
 	cmd.set('ignore_case', 'off') 
@@ -674,12 +653,9 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 	cmd.remove('solvent')
 	cmd.show('spheres', 'organic')
 	
-	start_time = time.clock()
-	
-	
 	''' only one object was selected'''
 	if len(selected) == 1:
-		initialize_movie(frames = '120')
+		initialize_movie(frames = '150')
 		
 		## com explosion
 		if typeOfExplosion == 'com':
@@ -688,83 +664,208 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 		## canonical explosion
 		elif typeOfExplosion == 'canonical':
 			canonical_explosion(selected[0])
-	
-	''' two object were selected'''
-	if len(selected) == 2:
-		initialize_movie(frames = '250')
-		
-		##get chains of complex
-		chains1 = cmd.get_chains(selected[0])
-		chains2 = cmd.get_chains(selected[1])
-		
-		## calculate translation factor with both objects to separate objects
-		s = selected[0] + ' ' + selected[1]
-		trans = calcTransFac(s)
+			
+	''' more than one object were selected'''
+	if len(selected) >= 2:
+		start_time = time.clock()
+		numFrames = 100*len(selected)
+		initialize_movie(frames = str(100+numFrames))
 		
 		## get ligands
 		storedLigands = get_ligands()
-		f = 1
-		cNames1, chainAndLabel1, chainAndLigand1, ligandAndChain1, ligandsCOMS1, chainsCOMS1, f  = \
-							create_objects(chains1, selected[0], storedLigands)
-		cNames2, chainAndLabel2, chainAndLigand2, ligandAndChain2, ligandsCOMS2, chainsCOMS2  = \
-							create_objects(chains2, selected[1], storedLigands)[:6]
-							
-							
-		''' com explosion	'''				
-		if typeOfExplosion == 'com':
-			
-			## calculate COMs of objects
-			a = calc_COM(selected[0])
-			b = calc_COM(selected[1])
 
-			f = f + 20
+		s = ''
+		chains = {}
+		cNames = []
+		chainAndLabel = {}
+		chainAndLigand = {}
+		ligandAndChain = {}
+		chainsAndObj = {}
 		
-			## separate objects (move only one object)
-			if a[0] >= b[0] and a[1] >= b[1] and a[2] >= b[2]:	
-				for chain in cNames1:
-					translate_selection(b, a, chain, trans, f = f, group = chain + '_')
-					translate_selection(b, a,'_label' + chain, trans, f = f, group = chain + '_')
-			else:
-				for chain in cNames2:
-					translate_selection(a, b, chain, trans, f = f, group = chain + '_')
-					translate_selection(a, b, '_label' + chain, trans, f = f, group = chain + '_')
-			
-			cmd.frame(f)
-			store_view(group=True, all = True)
-			
-			f = f + 20
-			cmd.frame(f)
-			store_view(group=True, all = True)
+		f = 1
+		
+		'''com'''
+		if typeOfExplosion == 'com':
 
-			print 'Preparation: ', time.clock() - start_time, 'seconds'
-			f = f + 30
+			coms = {}
+			ligandsCOMS = {}
+			chainsCOMS = {}
 			
-			## explosion of first object
-			trans = calcTransFac(selected[0])
-			f = com_explosion(selected[0], cNames = cNames1, chainAndLabel = \
-							chainAndLabel1, chainAndLigand = chainAndLigand1, 
-							ligandAndChain = ligandAndChain1, chainsCOMS= chainsCOMS1,
-							com = a, storedLigands = storedLigands, transFac = trans*2,
-							ligandsCOMS = ligandsCOMS1,frame = f, single = False)
-			f = f + 20
+			for obj in selected:
+				## calculate com of obj
+				coms[obj] = calc_COM(obj)
+				s = s + ' '+ obj
+			cmd.create('_all_obj', s)
+			complexXYZ = calc_COM('_all_obj')
+			trans = calcTransFac('_all_obj')
+			cmd.delete('_all_obj')
 			
-			## explosion of second object
-			trans = calcTransFac(selected[1])
-			f = com_explosion(selected[1], cNames = cNames2, chainAndLabel = \
-							chainAndLabel2, chainAndLigand = chainAndLigand2, 
-							ligandAndChain = ligandAndChain2, chainsCOMS= chainsCOMS2,
-							com = b, storedLigands = storedLigands, transFac = trans,
-							ligandsCOMS = ligandsCOMS2,frame = f, single = False)
+			for obj in selected:
+				##get chains of complex
+				chains[obj] = cmd.get_chains(obj)
+				for ch in chains[obj]:
+					chainsAndObj['chain' + ch] = obj
+				
+				cNames_new, chainAndLabel_new, chainAndLigand_new, ligandAndChain_new, ligandsCOMS_new, chainsCOMS_new, f= \
+								create_objects(chains[obj], obj, storedLigands)
+			
+				cNames = cNames + cNames_new
+				if chainAndLabel_new:
+					chainAndLabel.update(chainAndLabel_new)
+				if chainAndLigand_new:
+					chainAndLigand.update(chainAndLigand_new)
+				if ligandAndChain_new:
+					ligandAndChain.update(ligandAndChain_new)
+				if ligandsCOMS_new:
+					ligandsCOMS.update(ligandsCOMS_new)
+				if chainsCOMS_new:
+					chainsCOMS.update(chainsCOMS_new)
+				
 			f = f + 20
+			## separate objects
+			for obj in chains.keys():
+				create_complex(chains, obj)
+					
+				for obj2 in chains.keys():
+					if obj != obj2:
+						create_complex(chains, obj2)
+						## check if obj is colliding with any other obj
+						while isColliding('(_sel%s)'%obj, '(_sel%s)'%obj2):
+						
+							## if collision, translate all chains in selection
+							for cname in cNames:
+								com_translation(cname, chainAndLigand, complexXYZ, coms[chainsAndObj[cname]], trans, f)
+								
+							create_complex(chains, obj)
+							create_complex(chains, obj2)
+										
+				store_view(all = True)
+			
+			cmd.delete('(_sel%s)'%obj)
+			cmd.delete('(_sel%s)'%obj2)
+			f = f + 20
+			store_view(all = True)
+			
+			f = f + 20
+			## translate objects individually
+			for obj in chains.keys():
+				sel1=''
+				for c in chains[obj]:
+					sel1 = sel1 + 'chain' + c + ' '
+				cmd.select('_'+obj, sel1)
+				trans = calcTransFac('_'+obj)
+				
+				## get object's chains and ligands
+				objChains = [chain for chain, o in chainsAndObj.items() if o == obj]
+				ligandAndChain_obj= {}
+				for ch in objChains:
+					if ch in ligandAndChain.values():
+						ligandAndChain_obj.update({ligand: c for ligand, c in ligandAndChain.items() if c == ch})
+				
+				print 'Preparation:', time.clock() - start_time, 'seconds'
+				
+				## translation of object
+				f = com_explosion('_'+obj, cNames = objChains,
+								chainAndLabel = chainAndLabel, 
+								chainAndLigand = chainAndLigand, 
+								ligandAndChain = ligandAndChain_obj, 
+								chainsCOMS= chainsCOMS, com = coms[obj], 
+								storedLigands = storedLigands, 
+								transFac = trans, ligandsCOMS = ligandsCOMS,
+								frame = f, single = False)
+				cmd.delete('_'+obj)
+				f = f + 20
 			cmd.frame(f)
 			store_view(group=True, all=True)
-		
-		'''canonical explosion '''
-		elif typeOfExplosion == 'canonical':
-			canonical_explosion(selected[0], frame = f)
-			f = f + 50
-			canonical_explosion(selected[1], frame = f)
-		
+	
+		''' canonical'''
+		if typeOfExplosion == 'canonical':			
+			
+			for obj in selected:
+				s = s + ' '+ obj
+			cmd.create('_all_obj', s)
+			transVec = transAxes('_all_obj') 
+			print transVec
+			cmd.delete('_all_obj')
+			
+			for obj in selected:
+				##get chains of complex
+				chains[obj] = cmd.get_chains(obj)
+				for ch in chains[obj]:
+					chainsAndObj['chain' + ch] = obj
+				
+				cNames_new, chainAndLabel_new, chainAndLigand_new, ligandAndChain_new, f= \
+								create_objects(chains[obj], obj, storedLigands, typeOfExplosion = 'canonical')
+			
+				cNames = cNames + cNames_new
+				if chainAndLabel_new:
+					chainAndLabel.update(chainAndLabel_new)
+				if chainAndLigand_new:
+					chainAndLigand.update(chainAndLigand_new)
+				if ligandAndChain_new:
+					ligandAndChain.update(ligandAndChain_new)
+				
+			f = f + 30
+			i = 1
+			cmd.frame(f)
+			## separate objects
+			for obj in chains.keys():
+				create_complex(chains, obj)
+					
+				for obj2 in chains.keys():
+					if obj != obj2:
+						create_complex(chains, obj2)
+						
+						## check if obj is colliding with any other obj and 
+						## translate if necessary
+						while isColliding('(_sel%s)'%obj, '(_sel%s)'%obj2):
+							for o in chains.keys()[1:]:
+								for ch in chains[o]:
+									ch = 'chain' + ch
+									canonical_tranlation(ch, i, transVec, chainAndLigand)
+								i = i + 1
+							create_complex(chains, obj)
+							create_complex(chains, obj2)
+						
+			store_view(group = True, all = True)
+			cmd.delete('(_sel%s)' %obj)
+			cmd.delete('(_sel%s)' %obj2)
+			f = f + 30
+			store_view(all = True)
+			
+			f = f + 30
+			
+			print 'Preparation:', time.clock() - start_time, 'seconds'
+			## translate objects individually
+			for obj in chains.keys():
+				sel1=''
+				for c in chains[obj]:
+					sel1 = sel1 + 'chain' + c + ' '
+				cmd.select('_'+obj, sel1)
+				trans = transAxes('_'+obj)
+				
+				## get object's chains and ligands
+				objChains = [chain for chain, o in chainsAndObj.items() if o == obj]
+				ligandAndChain_obj= {}
+				for ch in objChains:
+					if ch in ligandAndChain.values():
+						ligandAndChain_obj.update({ligand: c for ligand, c in ligandAndChain.items() if c == ch})
+						
+				f = canonical_explosion('_'+obj, cNames = objChains,
+								chainAndLabel = chainAndLabel, 
+								chainAndLigand = chainAndLigand, 
+								ligandAndChain = ligandAndChain_obj, 
+								storedLigands = storedLigands, transVec = trans,
+								frame = f, single = False)
+				cmd.delete('_'+obj)
+				f = f + 30
+			cmd.frame(f)
+			store_view(group=True, all=True)
+			
+			f = f + 30
+			cmd.frame(f)
+			store_view(group=True, all=True)
+			
 def relabel(selected, newLabel="new label"):
 	'''DESCRIPTION:
 		rename an selected object and its label by a new label
@@ -778,7 +879,6 @@ def relabel(selected, newLabel="new label"):
 	## rename all objects of selection
 	for o in obj:
 		if selected in o:
-			print o
 			x = o
 			x = x.replace(selected, newLabel)
 			cmd.set_name(o, x)
@@ -807,3 +907,4 @@ cmd.extend('canonical_explosion', canonical_explosion)
 # cmd.extend('renew_explosion', renew_explosion)
 cmd.extend('explosion', explosion)
 cmd.extend('relabel', relabel)
+cmd.extend('coll', isColliding)
