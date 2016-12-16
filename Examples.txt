@@ -19,3 +19,7 @@ Problematisch:
 1VQP: Transition state analogue "RAP" bound to the large ribosomal subunit (27-mer) enthält als chain id integer
 5J4B: bacterial ribosome bound to cisplatin (27-mer) kein Standard-PDB Format
 5IT8: bacterial ribosome (55-mer) kein Standard-PDB Format
+
+
+
+2bg9 nAChR
