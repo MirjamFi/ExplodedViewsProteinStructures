@@ -1,4 +1,4 @@
-# run C:/Users/Figaschewski/Dropbox/Masterarbeit/Masterthesis/esplosion_jens2.py
+# run C:/Users/Figaschewski/Dropbox/Masterarbeit/Masterthesis/explosion_jens2.py
 from pymol import cmd 
 import math
 import center_of_mass as cenma ## calulate center of mass
