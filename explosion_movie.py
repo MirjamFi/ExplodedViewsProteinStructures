@@ -1,44 +1,27 @@
 # run C:/Users/Figaschewski/Dropbox/Masterarbeit/Masterthesis/explosion_movie.py
 
-''' needs get_colors.py and center_of_mass.py'''
-
-
-'''TODO: multiple states 5K7L
-		multiple ligands on one chain 4ESV'''
-# ''' load complex from PDB'''
-# cmd.reinitialize()
-# selected = '3oaa'
-# pdbFile = selected + '.pdb1'
-# cmd.fetch(selected, type='pdb1')
-# util.cbc(selection= selected)
-# cmd.remove('solvent')
-# extract ABCDEF, chain A chain B chain C chain D chain E chain F
-# extract GH, chain G chain H
-# explosion(['ABCDEF','GH'])
-
-# cmd.set('ignore_case', 'off')
-# fetch 3oaa
-# run C:/Users/Figaschewski/Dropbox/Masterarbeit/Masterthesis/explosion_movie.py
-# create mol1, chain A chain B chain  C chain D chain  E chain F chain G chain  H
-# create mol2, chain I chain J chain  K chain L chain  M chain N chain O chain  P
-# create mol3, chain Q chain R chain  S chain T chain  U chain V chain W chain  X
-# explosion(['mol1', 'mol2', 'mol3'])
-
 '''
-	Create a movie of an exploded view for a given protein structure (PDB) or 
-	parts of it.
-	If you use explosion() it will explode parts along a vector of the center of
-	mass of the original complex and the COM of the selection. Here, you can 
-	select single or multiple chains, a residue or ligand to be exploded, 
-	just extract them into one object from source structure. If chains contain 
-	ligands, those 	will also be exploded.
-	To explode specific chains/residue/ligand it is useful to also give the 
-	complex for explosion directon, espacially for single chain, so the chain is 
-	not	translated into the complex.
-	If you use canonical_explosion() the parts of the selection will be 
-	translated in the same direction. You can select the whole complex or single/
-	multiple chains.
-	Exploded parts will be labeled.
+explosion creates a movie of the exploded view of a molecule. 
+If there are multiple objects given for explosion, first they get spatially 
+separated and then explode individually one after the other. The order of 
+explosion is the order of given list of objects.
+There are two types of explosion direction:
+- 'com' (default): 	the centers of mass (com) of the chains of the object to be 
+					tranlated and the object are calulated and the single chains 
+					are translated along a vector through the chain's com and 
+					object's com.
+- 'canonical':		the dimensions of a box around the object are used to select 
+					the two longest edges and so the axes to translate along in	
+					a consistent distance
+					
+If only a part of the object shall be translated the object can be given as 
+complex to make sure the part is not translated into the object.
+
+DEPENDENCIES:
+get_colors.py (https://pymolwiki.org/index.php/Get_colors) and 
+center_of_mass.py (https://pymolwiki.org/index.php/Center_of_mass)
+in the modules of PyMOL.
+
 '''
 from pymol import cmd 
 import math
@@ -59,6 +42,7 @@ def initialize_movie(selected = None, frames = "100"):
 	cmd.config_mouse('three_button_motions', 1)
 	# cmd.set('movie_panel', 0)	## hide movie panel
 	cmd.set('movie_panel_row_height', 1)
+	cmd.set('movie_fps', 15)
 	
 	cmd.mset('1 x' + frames)
 	if selected:
@@ -289,7 +273,7 @@ def label_obj(chainname, chainAndLabel = None):
 def color_binding(chainname, ligandname, res = False):
 	''' DESCRIPTION:
 		color binding site '''
-	binding = 'byres (' + chainname + ' nto. 3 of ' + \
+	binding = 'byres (' + chainname + ' nto. 3.6 of ' + \
 				ligandname +')'
 	cmd.select('_inter', binding)
 	cmd.color('red', '_inter')
@@ -447,11 +431,9 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 	## COM of complex
 	## if only some chains are selected and source complex is given,
 	## select source complex for COM calculation
-	if complex:
-		complexXYZ = calc_COM(complex)
 	if com:
 		complexXYZ = com
-	if not com and not complex:
+	if not com:
 		complexXYZ = calc_COM(selected)
 	
 	''' translate chains '''
@@ -479,8 +461,8 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 		## if only one chain is selected, translate it and its ligand
 		else:
 			cmd.frame(f)
-			cmd.orient(chainname)
-			store_view(chainname + '_', all = True)
+			cmd.zoom(chainname)
+			store_view(chainname + '_')
 			
 			f = f + 30
 			cmd.frame(f)
@@ -497,7 +479,6 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 					cmd.translate([transFac, transFac, transFac], 
 										object = chainname + "_")
 										
-			# cmd.center(chainname)
 			store_view(chainname + '_', all = True)
 					
 			## store objects for movie
@@ -558,13 +539,21 @@ def canonical_explosion(selected, cNames = None, chainAndLabel = None,
 	''' translate chains'''
 	i = 1
 	cmd.frame(f)
-	for chain in cNames:
-		for c in cNames:
-			if c != chain:
-				while isColliding(chain, c):
-					for ch in cNames[1:]:
-						canonical_tranlation(ch, i, transVec, chainAndLigand)
-						i += 1
+	if complex:
+		for chain in cNames:
+			while isColliding(chain, complex):
+				for ch in cNames:
+					canonical_tranlation(ch, i, transVec, chainAndLigand)
+					i += 1
+	else:
+		for chain in cNames:
+			for c in cNames:
+				if c != chain:
+					while isColliding(chain, c):
+						for ch in cNames[1:]:
+							canonical_tranlation(ch, i, transVec, chainAndLigand)
+							i += 1
+
 				
 	store_view(group = True, all = True)
 	
@@ -646,8 +635,10 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 				## calculate com of obj
 				coms[obj] = calc_COM(obj)
 			s = s + ' '+ obj
+			
 		if not complex:	
 			cmd.create('_all_obj', s)
+			
 			if typeOfExplosion == 'com':
 				## calc com of complex from objects
 				complexXYZ = calc_COM('_all_obj')
@@ -656,7 +647,9 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 				## calculate translation vector
 				transVec = transAxes('_all_obj') 
 				print transVec
+			cmd.frame(1)
 			cmd.orient('_all_obj')
+			cmd.mview('store')
 			cmd.delete('_all_obj')
 				
 		else:
@@ -698,8 +691,8 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 				if chainsCOMS_new:
 					chainsCOMS.update(chainsCOMS_new)
 
+		f = f + 30
 		if len(selected) > 1:
-			f = f + 30
 			if typeOfExplosion == 'canonical':
 				i = 1
 			cmd.frame(f)
@@ -760,7 +753,8 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 			
 			## translation of object
 			if typeOfExplosion == 'com':
-				f = com_explosion('_'+obj, cNames = objChains,
+				if not complex:
+					f = com_explosion('_'+obj, cNames = objChains,
 								chainAndLabel = chainAndLabel, 
 								chainAndLigand = chainAndLigand, 
 								ligandAndChain = ligandAndChain_obj, 
@@ -768,13 +762,32 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 								storedLigands = storedLigands, 
 								transFac = trans, ligandsCOMS = ligandsCOMS,
 								frame = f)
+				else:
+					f = com_explosion('_'+obj, cNames = objChains,
+								chainAndLabel = chainAndLabel, 
+								chainAndLigand = chainAndLigand, 
+								ligandAndChain = ligandAndChain_obj, 
+								chainsCOMS= chainsCOMS, complex = complex,
+								com = complexXYZ, storedLigands = storedLigands, 
+								transFac = trans, ligandsCOMS = ligandsCOMS,
+								frame = f)
 			else:
-				f = canonical_explosion('_'+obj, cNames = objChains,
+				if complex:
+					f = canonical_explosion('_'+obj, cNames = objChains,
+							chainAndLabel = chainAndLabel, 
+							chainAndLigand = chainAndLigand, 
+							ligandAndChain = ligandAndChain_obj, complex = complex,
+							storedLigands = storedLigands, transVec = trans,
+							frame = f)
+				else:
+					f = canonical_explosion('_'+obj, cNames = objChains,
 							chainAndLabel = chainAndLabel, 
 							chainAndLigand = chainAndLigand, 
 							ligandAndChain = ligandAndChain_obj, 
 							storedLigands = storedLigands, transVec = trans,
 							frame = f)
+				
+				
 			cmd.delete('_'+obj)
 			
 def relabel(selected, newLabel="new label"):
@@ -807,10 +820,7 @@ def renew_explosion(frame=1):
 		cmd.set_view(x)
 		cmd.zoom('all')
 		cmd.mview('store')
-	
-cmd.extend('com_explosion', com_explosion)
-cmd.extend('canonical_explosion', canonical_explosion)	
+		
 cmd.extend('renew_explosion', renew_explosion)
 cmd.extend('explosion', explosion)
 cmd.extend('relabel', relabel)
-cmd.extend('coll', isColliding)
