@@ -1,28 +1,28 @@
-explosion creates a movie of the exploded view of a molecule. 
+**explosion** creates a movie of the exploded view of a molecule. 
 If there are multiple objects given for explosion, first they get spatially 
 separated and then explode individually one after the other. The order of 
 explosion is the order of given list of objects.
 There are two types of explosion direction:
-- 'com' (default): 	the centers of mass (com) of the chains of the object to be 
+- **'com'** (default): 	the centers of mass (com) of the chains of the object to be 
 					tranlated and the object are calulated and the single chains 
 					are translated along a vector through the chain's com and 
 					object's com.
-- 'canonical':		the dimensions of a box around the object are used to select 
+- **'canonical'**:		the dimensions of a box around the object are used to select 
 					the two longest edges and so the axes to translate along in	
 					a consistent distance
 					
 If only a part of the object shall be translated the object can be given as 
 complex to make sure the part is not translated into the object.
 
-DEPENDENCIES:
-get_colors.py (https://pymolwiki.org/index.php/Get_colors) and 
-center_of_mass.py (https://pymolwiki.org/index.php/Center_of_mass)
+###DEPENDENCIES:
+[get_colors.py](https://pymolwiki.org/index.php/Get_colors) and 
+[center_of_mass.py](https://pymolwiki.org/index.php/Center_of_mass)
 in the modules of PyMOL.
 
-USAGE:
+###USAGE:
 explosion(list of objects, [type of explosion [,complex]])
 
-ARGUMENTS:
+###ARGUMENTS:
 list of objects: 	list of strings 	Objects' names to explode
 type of explosion: 	string 				'com'(default) or 'canonical'
 complex:			string				Name of object relative to the part of 
@@ -33,7 +33,7 @@ complex:			string				Name of object relative to the part of
 										
 
 
-EXAMPLES:
+###EXAMPLES:
 
 	# run explosion_movie.py from absolute directory:
 	run C:/.../explosion_movie.py
