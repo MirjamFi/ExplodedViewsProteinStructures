@@ -42,7 +42,7 @@ def initialize_movie(selected = None, frames = "100"):
 	cmd.config_mouse('three_button_motions', 1)
 	# cmd.set('movie_panel', 0)	## hide movie panel
 	cmd.set('movie_panel_row_height', 1)
-	cmd.set('movie_fps', 15)
+	cmd.set('movie_fps', 5)
 	
 	cmd.mset('1 x' + frames)
 	if selected:
@@ -194,7 +194,17 @@ def create_objects(chains, selected, storedLigands, chainAndLigand = None, typeO
 	cmd.frame(f)
 	## store chain objects for movie 
 	store_view(group = True, all = True)
+	f = f + 1
 	
+	## hide labels
+	cmd.hide('labels')
+	cmd.scene('off', 'store')
+	cmd.frame(f)
+	cmd.mview('store', scene='off')
+	
+	
+
+		
 	if typeOfExplosion == 'com':
 		return cNames, chainAndLabel, chainAndLigand, ligandAndChain, ligandsCOMS, chainsCOMS, f
 	else:
@@ -488,9 +498,18 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 
 	## store objects for movie
 	f = frame + 30
-	cmd.frame(f)
-	store_view(group=True, all = True)
-	
+	if not ligandAndChain:
+		## show labels
+		cmd.show('labels')
+		cmd.scene('on', 'store')
+		cmd.frame(f)
+		cmd.mview('store', scene='on')
+		store_view(group=True, all = True)
+
+	else:
+		cmd.frame(f)
+		store_view(group=True, all = True)
+
 	''' translate ligands '''
 	if ligandAndChain:
 		f = f + 30
@@ -520,10 +539,17 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 				else:
 					condition = isColliding(ligand, ligandAndChain[ligand])
 
-		f = f + 30
+		f = f + 10
+		## show labels
+		cmd.show('labels')
+		cmd.scene('on', 'store')
+		cmd.frame(f)
+		cmd.mview('store', scene='on')
+		cmd.mview('reinterpolate')
+
+		f = f + 20
 		cmd.frame(f)
 		store_view(group=True, all = True)
-		
 	print 'Explosion of', selected, time.clock() - start_time, 'seconds'
 	return f
 
@@ -558,8 +584,17 @@ def canonical_explosion(selected, cNames = None, chainAndLabel = None,
 	store_view(group = True, all = True)
 	
 	f = f + 30
-	cmd.frame(f)
-	store_view(group=True, all = True)
+	if not ligandAndChain:
+		## show labels
+		cmd.show('labels')
+		cmd.scene('on', 'store')
+		cmd.frame(f)
+		cmd.mview('store', scene='on')
+		store_view(group=True, all = True)
+
+	else:
+		cmd.frame(f)
+		store_view(group=True, all = True)
 		
 	''' translate ligands'''
 	if ligandAndChain:
@@ -572,8 +607,13 @@ def canonical_explosion(selected, cNames = None, chainAndLabel = None,
 			store_view(group = True, all = True)
 			
 		f = f + 30
+		## show labels
+		cmd.show('labels')
+		cmd.scene('on', 'store')
 		cmd.frame(f)
-		store_view(group = True, all = True)
+		cmd.mview('store', scene='on')
+		cmd.mview('reinterpolate')
+		store_view(group=True, all = True)
 					
 	print 'Explosion of', selected, time.clock() - start_time, 'seconds'
 	return f
@@ -691,7 +731,7 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 				if chainsCOMS_new:
 					chainsCOMS.update(chainsCOMS_new)
 
-		f = f + 30
+		f = f + 30		
 		if len(selected) > 1:
 			if typeOfExplosion == 'canonical':
 				i = 1
@@ -809,18 +849,30 @@ def relabel(selected, newLabel="new label"):
 
 '''TODO: video muss zweimal gespeichert werden (bei erstem mal noch wackeln in 
 			letztem gespeicherten frame) '''
-def renew_explosion(frame=1):
+def reorient_explosion(frame=1):
 	'''DESCRIPTION:
 		if called, the orientation of the movie is set to the orientation of 
 		given frame from frame till end. '''
 	x = cmd.get_view(quiet=1)
 	frames = cmd.count_frames()
-	for f in range(frame,frames+1):
+	for f in range(int(frame),frames+1):
 		cmd.frame(f)
 		cmd.set_view(x)
 		cmd.zoom('all')
 		cmd.mview('store')
+	
+def renew_representation(selection, representation):
+	'''DESCRIPTION:
+		show selection in given representation
+	'''
+	cmd.scene(selection+'_'+representation, 'store')
+	for f in range(1, cmd.count_frames()):
+		cmd.frame(f)
+		cmd.mview('store', scene=selection+'_'+representation)
+		cmd.show_as(representation, selection)
+		cmd.mview('reinterpolate')
 		
-cmd.extend('renew_explosion', renew_explosion)
+cmd.extend('reorient_explosion', reorient_explosion)
 cmd.extend('explosion', explosion)
 cmd.extend('relabel', relabel)
+cmd.extend('renew_representation', renew_representation)
