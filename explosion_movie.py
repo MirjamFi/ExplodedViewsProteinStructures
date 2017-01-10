@@ -502,12 +502,8 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 	## store objects for movie
 	f = frame + 30
 	if not ligandAndChain:
-		## show labels
-		cmd.show('labels')
-		cmd.scene('on', 'store')
 		cmd.frame(f)
 		best_view('all', 'chain', '10')
-		cmd.mview('store', scene='on')
 		store_view(group=True, all = True)
 
 	else:
@@ -546,15 +542,15 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 
 		f = f + 10
 		## show labels
-		cmd.show('labels')
-		cmd.scene('on', 'store')
-		cmd.frame(f)
-		cmd.mview('store', scene='on')
-		cmd.mview('reinterpolate')
+		# cmd.show('labels')
+		# cmd.scene('on', 'store')
+		# cmd.frame(f)
+		# cmd.mview('store', scene='on')
+		# cmd.mview('reinterpolate')
 
 		f = f + 20
 		cmd.frame(f)
-		best_view('all', 'chain', '10')
+		# best_view('all', 'chain', '10')
 		store_view(group=True, all = True)
 	return f
 
@@ -591,10 +587,10 @@ def canonical_explosion(selected, cNames = None, chainAndLabel = None,
 	f = f + 30
 	if not ligandAndChain:
 		## show labels
-		cmd.show('labels')
-		cmd.scene('on', 'store')
+		# cmd.show('labels')
+		# cmd.scene('on', 'store')
 		cmd.frame(f)
-		cmd.mview('store', scene='on')
+		# cmd.mview('store', scene='on')
 		store_view(group=True, all = True)
 
 	else:
@@ -613,10 +609,10 @@ def canonical_explosion(selected, cNames = None, chainAndLabel = None,
 			
 		f = f + 30
 		## show labels
-		cmd.show('labels')
-		cmd.scene('on', 'store')
+		# cmd.show('labels')
+		# cmd.scene('on', 'store')
 		cmd.frame(f)
-		cmd.mview('store', scene='on')
+		# cmd.mview('store', scene='on')
 		cmd.mview('reinterpolate')
 		best_view('all', 'chain', '10')
 		store_view(group=True, all = True)
@@ -832,8 +828,16 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 				
 				
 			cmd.delete('_'+obj)
-			
+	
+	numframes = cmd.count_frames()
+	cmd.frame(f)
+	## show labels
+	cmd.show('labels')
+	cmd.scene('on', 'store')
+	cmd.mview('store', scene='on')
+	cmd.frame(numframes)
 	best_view('all', 'chain', '10')
+	store_view(group=True, all = True)
 	print 'Explosion of', selected, time.clock() - start_time, 'seconds'
 			
 def relabel(selected, newLabel="new label"):
