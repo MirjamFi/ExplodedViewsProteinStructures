@@ -9,7 +9,7 @@ There are two types of explosion direction:
 If only a part of the object shall be translated the object can be given as
 complex to make sure the part is not translated into the object.
 
-###DEPENDENCIES: 
+###DEPENDENCIES:
 
 [get_colors.py](https://pymolwiki.org/index.php/Get_colors),
 [center_of_mass.py](https://pymolwiki.org/index.php/Center_of_mass),
@@ -43,22 +43,22 @@ explosion(list of objects, [type of explosion [,complex]])
 
 	# either explode complete molecule:
 	explosion(['3oaa'])
-	![](https://www.dropbox.com/s/xvlhi04ixpvyo7f/3oaa_complete_start.png?dl=0)
-	![](https://www.dropbox.com/s/fvjd251k9a29zpr/3oaa_complete.png?dl=0)
-	![](https://www.dropbox.com/s/o98cy8m6b9rk2v1/3oaa_complete_end.png?dl=0)
+	![](images/3oaa_complete_start.png)
+	![](images/3oaa_complete.png)
+	![](images/3oaa_complete_end.png)
 	# or parts of it:
 	create ABCDEF, chain A chain B chain C chain D chain E chain F
 	create GH, chain G chain H
 	explosion(['ABCDEF','GH'])
-	![](https://www.dropbox.com/s/r1vp7itwbmaoyr1/3oaa_parts_start.png?dl=0)
-	![](https://www.dropbox.com/s/mf8e03hatkn9ric/3oaa_parts_1.png?dl=0)
-	![](https://www.dropbox.com/s/xpxcntw4lus1ehi/3oaa_parts_2.png?dl=0)
-	![](https://www.dropbox.com/s/9xx2jybf8vwnc5p/3oaa_parts_end.png?dl=0)
+	![](images/3oaa_parts_start.png)
+	![](images/3oaa_parts_1.png)
+	![](images/3oaa_parts_2.png)
+	![](images/3oaa_parts_end.png)
 
 	# or explode canonical:
 	explosion(['3oaa'], 'canonical')
-	![](https://www.dropbox.com/s/oz2eszcqe1esiv8/3oaa_canonical_start.png?dl=0)
-	![](https://www.dropbox.com/s/ob5zsth85gqi4ol/3oaa_canonical_end.png?dl=0)
+	![](images/3oaa_canonical_start.png)
+	![](images/3oaa_canonical_end.png)
 	____________________________________________________________________________
 	# load multiple symmetry operators
 	fetch 3oaa
