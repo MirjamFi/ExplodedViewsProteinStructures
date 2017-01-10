@@ -30,11 +30,11 @@ explosion(list of objects, [type of explosion [,complex]])
 
 
 ###EXAMPLES:
-
-	# run explosion_movie.py from absolute directory:
-	run C:/.../explosion_movie.py
-
-	____________________________________________________________________________
+```python
+	# run explosion_movie.py
+	run explosion_movie.py
+```
+```python
 	# load molecule in PyMOL:
 	fetch 3oaa, type='pdb1'
 
@@ -43,23 +43,35 @@ explosion(list of objects, [type of explosion [,complex]])
 
 	# either explode complete molecule:
 	explosion(['3oaa'])
-	![](images/3oaa_complete_start.png)
-	![](images/3oaa_complete.png)
-	![](images/3oaa_complete_end.png)
+	```
+![](images/3oaa_complete_start.png)
+
+![](images/3oaa_complete.png)
+
+![](images/3oaa_complete_end.png)
+
+```python
 	# or parts of it:
 	create ABCDEF, chain A chain B chain C chain D chain E chain F
 	create GH, chain G chain H
 	explosion(['ABCDEF','GH'])
-	![](images/3oaa_parts_start.png)
-	![](images/3oaa_parts_1.png)
-	![](images/3oaa_parts_2.png)
-	![](images/3oaa_parts_end.png)
+```
+![](images/3oaa_parts_start.png)
 
+![](images/3oaa_parts_1.png)
+
+![](images/3oaa_parts_2.png)
+
+![](images/3oaa_parts_end.png)
+```python
 	# or explode canonical:
 	explosion(['3oaa'], 'canonical')
-	![](images/3oaa_canonical_start.png)
-	![](images/3oaa_canonical_end.png)
-	____________________________________________________________________________
+```
+![](images/3oaa_canonical_start.png)
+
+![](images/3oaa_canonical_end.png)
+
+```python
 	# load multiple symmetry operators
 	fetch 3oaa
 
@@ -73,8 +85,14 @@ explosion(list of objects, [type of explosion [,complex]])
 	create mol4, chain Y chain Z chain  a chain b chain  c chain d chain e chain  f
 
 	explosion(['mol1', 'mol2', 'mol3', 'mol4'])
+```
+![](images/3oaa_multi_start.png)
 
-	____________________________________________________________________________
+![](images/3oaa_multi1.png)
+
+![](images/3oaa_multi_end.png)
+
+```python
 	# portein with multiple states:
 	fetch 5k7l, type=pdb1
 
@@ -82,8 +100,14 @@ explosion(list of objects, [type of explosion [,complex]])
 	split_states 5k7l
 
 	explosion(['5k7l_0001', '5k7l_0002', '5k7l_0003', '5k7l_0004'])
+```
+![](images/5k7l_start.png)
 
-	____________________________________________________________________________
+![](images/5k7l_1.png)
+
+![](images/5k7l_end.png)
+
+```python
 	# load molecule
 	fetch 3oaa, type = pdb1
 
@@ -91,3 +115,7 @@ explosion(list of objects, [type of explosion [,complex]])
 	extract chainA, chain A
 
 	explosion(['chainA'], 'com', '3oaa')
+```
+![](images/chain_start.png)
+
+![](images/chain_end.png)
