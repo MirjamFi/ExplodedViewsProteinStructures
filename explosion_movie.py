@@ -31,6 +31,7 @@ from pymol import util ## color by chain
 import get_colors ## get random colors
 import time
 from operator import itemgetter
+from viewpoints import best_view
 
 def initialize_movie(selected = None, frames = "100"):
 	''' DESCRIPTION: 
@@ -164,6 +165,7 @@ def create_objects(chains, selected, storedLigands, chainAndLigand = None, typeO
 		f = 1
 		cmd.frame(f)
 		cmd.mview('store', object=chainname)
+		best_view('all', 'chain', '10')
 		cmd.mview('store', object="_label" + chainname)
 		
 		## calculate and save COM of chain
@@ -193,6 +195,7 @@ def create_objects(chains, selected, storedLigands, chainAndLigand = None, typeO
 	f = f + 20
 	cmd.frame(f)
 	## store chain objects for movie 
+	best_view('all', 'chain', '10')
 	store_view(group = True, all = True)
 	f = f + 1
 	
@@ -465,7 +468,7 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 						for cname in cNames:
 							cXYZ = chainsCOMS[cname]
 							com_translation(cname, chainAndLigand, complexXYZ, cXYZ, transFac, f)
-									
+						
 			store_view(group = True, all = True)
 									
 		## if only one chain is selected, translate it and its ligand
@@ -503,11 +506,13 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 		cmd.show('labels')
 		cmd.scene('on', 'store')
 		cmd.frame(f)
+		best_view('all', 'chain', '10')
 		cmd.mview('store', scene='on')
 		store_view(group=True, all = True)
 
 	else:
 		cmd.frame(f)
+		best_view('all', 'chain', '10')
 		store_view(group=True, all = True)
 
 	''' translate ligands '''
@@ -549,8 +554,8 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 
 		f = f + 20
 		cmd.frame(f)
+		best_view('all', 'chain', '10')
 		store_view(group=True, all = True)
-	print 'Explosion of', selected, time.clock() - start_time, 'seconds'
 	return f
 
 def canonical_explosion(selected, cNames = None, chainAndLabel = None, 
@@ -580,7 +585,7 @@ def canonical_explosion(selected, cNames = None, chainAndLabel = None,
 							canonical_tranlation(ch, i, transVec, chainAndLigand)
 							i += 1
 
-				
+	best_view('all', 'chain', '10')			
 	store_view(group = True, all = True)
 	
 	f = f + 30
@@ -613,9 +618,9 @@ def canonical_explosion(selected, cNames = None, chainAndLabel = None,
 		cmd.frame(f)
 		cmd.mview('store', scene='on')
 		cmd.mview('reinterpolate')
+		best_view('all', 'chain', '10')
 		store_view(group=True, all = True)
 					
-	print 'Explosion of', selected, time.clock() - start_time, 'seconds'
 	return f
 	
 def explosion(selected = [], typeOfExplosion = 'com', complex = None):
@@ -688,7 +693,6 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 				transVec = transAxes('_all_obj') 
 				print transVec
 			cmd.frame(1)
-			cmd.orient('_all_obj')
 			cmd.mview('store')
 			cmd.delete('_all_obj')
 				
@@ -759,7 +763,6 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 									i = i + 1
 							create_complex(chains, obj)
 							create_complex(chains, obj2)
-										
 				store_view(group = True, all = True)
 				
 			f = f+ 30
@@ -829,6 +832,9 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 				
 				
 			cmd.delete('_'+obj)
+			
+	best_view('all', 'chain', '10')
+	print 'Explosion of', selected, time.clock() - start_time, 'seconds'
 			
 def relabel(selected, newLabel="new label"):
 	'''DESCRIPTION:
