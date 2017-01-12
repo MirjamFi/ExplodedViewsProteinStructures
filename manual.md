@@ -25,10 +25,6 @@ explosion(list of objects, [type of explosion [,complex]])
 - complex:			string				Name of object relative to the part of molecule which shall be translated
 
 
-
-
-
-
 ###EXAMPLES:
 ```python
 	# run explosion_movie.py

@@ -165,7 +165,7 @@ def create_objects(chains, selected, storedLigands, chainAndLigand = None, typeO
 		f = 1
 		cmd.frame(f)
 		cmd.mview('store', object=chainname)
-		best_view('all', 'chain', '10')
+		# best_view('all', 'chain', '10')
 		cmd.mview('store', object="_label" + chainname)
 		
 		## calculate and save COM of chain
@@ -192,10 +192,12 @@ def create_objects(chains, selected, storedLigands, chainAndLigand = None, typeO
 			if chainname in chainAndLigand: del chainAndLigand[chainname]
 			cmd.group(chainname + "_", chainname + " and " + "_label" \
 						+ chainname)
+	best_view('all', 'chain', '10')
+	cmd.mview('store')					
 	f = f + 20
 	cmd.frame(f)
 	## store chain objects for movie 
-	best_view('all', 'chain', '10')
+	# best_view('all', 'chain', '10')
 	store_view(group = True, all = True)
 	f = f + 1
 	
@@ -501,15 +503,21 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 
 	## store objects for movie
 	f = frame + 30
-	if not ligandAndChain:
-		cmd.frame(f)
-		best_view('all', 'chain', '10')
-		store_view(group=True, all = True)
+	# if not ligandAndChain:
+		# cmd.frame(f)
+		# best_view('all', 'chain', '10')
+		# store_view(group=True, all = True)
 
-	else:
-		cmd.frame(f)
-		best_view('all', 'chain', '10')
-		store_view(group=True, all = True)
+	# else:
+	cmd.frame(f)
+	best_view('all', 'chain', '10')
+	store_view(group=True, all = True)
+	
+	# if len(cNames) == 1:
+		# cmd.frame(f)
+		# best_view(selected, 'chain', '10')
+		# cmd.zoom('all')
+		# store_view(group=True, all = True)
 
 	''' translate ligands '''
 	if ligandAndChain:
@@ -550,7 +558,7 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 
 		f = f + 20
 		cmd.frame(f)
-		# best_view('all', 'chain', '10')
+		best_view('all', 'chain', '10')
 		store_view(group=True, all = True)
 	return f
 
@@ -585,17 +593,18 @@ def canonical_explosion(selected, cNames = None, chainAndLabel = None,
 	store_view(group = True, all = True)
 	
 	f = f + 30
-	if not ligandAndChain:
-		## show labels
-		# cmd.show('labels')
-		# cmd.scene('on', 'store')
-		cmd.frame(f)
-		# cmd.mview('store', scene='on')
-		store_view(group=True, all = True)
+	# if not ligandAndChain:
+		# ## show labels
+		# # cmd.show('labels')
+		# # cmd.scene('on', 'store')
+		# cmd.frame(f)
+		# # cmd.mview('store', scene='on')
+		# store_view(group=True, all = True)
 
-	else:
-		cmd.frame(f)
-		store_view(group=True, all = True)
+	# else:
+	cmd.frame(f)
+	best_view('all', 'chain', '10')
+	store_view(group=True, all = True)
 		
 	''' translate ligands'''
 	if ligandAndChain:
@@ -642,6 +651,7 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 	cmd.remove('solvent')
 	cmd.hide('all')
 	
+	
 	if complex:
 		cmd.show('surface', complex)
 		
@@ -652,7 +662,7 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 		if len(selected) > 1:
 			initialize_movie(frames = str(130*len(selected)+100))
 		else:
-			initialize_movie(frames = str(150))
+			initialize_movie(frames = str(180))
 		
 		## get ligands
 		storedLigands = get_ligands()
@@ -730,7 +740,7 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 					ligandsCOMS.update(ligandsCOMS_new)
 				if chainsCOMS_new:
 					chainsCOMS.update(chainsCOMS_new)
-
+	
 		f = f + 30		
 		if len(selected) > 1:
 			if typeOfExplosion == 'canonical':
@@ -835,9 +845,10 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 	cmd.show('labels')
 	cmd.scene('on', 'store')
 	cmd.mview('store', scene='on')
-	cmd.frame(numframes)
-	best_view('all', 'chain', '10')
-	store_view(group=True, all = True)
+	# cmd.frame(numframes)
+	# best_view('all', 'chain', '10')
+	# store_view(group=True, all = True)
+	# cmd.mview('store')
 	print 'Explosion of', selected, time.clock() - start_time, 'seconds'
 			
 def relabel(selected, newLabel="new label"):
