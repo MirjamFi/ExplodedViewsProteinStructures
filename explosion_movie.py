@@ -32,6 +32,7 @@ import get_colors ## get random colors
 import time
 from operator import itemgetter
 from viewpoints import best_view
+from draw_links import draw_links
 
 def initialize_movie(selected = None, frames = "100"):
 	''' DESCRIPTION: 
@@ -43,7 +44,7 @@ def initialize_movie(selected = None, frames = "100"):
 	cmd.config_mouse('three_button_motions', 1)
 	# cmd.set('movie_panel', 0)	## hide movie panel
 	cmd.set('movie_panel_row_height', 1)
-	cmd.set('movie_fps', 5)
+	cmd.set('movie_fps', 8)
 	
 	cmd.mset('1 x' + frames)
 	if selected:
@@ -125,8 +126,10 @@ def transAxes(selected):
 		
 	return transVec
 	
-def create_objects(chains, selected, storedLigands, chainAndLigand = None, typeOfExplosion = 'com'):
+def create_objects(chains, selected, storedLigands, chainsCOMS, complexXYZ, dim, chainAndLigand = None, typeOfExplosion = 'com'):
 
+	label_objec = {}
+	
 	## names of chains
 	cNames = []
 	
@@ -158,19 +161,27 @@ def create_objects(chains, selected, storedLigands, chainAndLigand = None, typeO
 		else:
 			cmd.show('surface', chainname)
 		
+		## calculate and save COM of chain
+		chainsCOMS[chainname] = calc_COM(chainname)
+			
 		## label chains
-		chainAndLabel = label_obj(chainname, chainAndLabel)
+		chainCOM = chainsCOMS[chainname]
+		labels = label_obj(chainname, chainCOM, complexXYZ, dim, chainAndLabel)
+		if len(labels) > 1:
+			chainAndLabel = labels[0]
+			label_objects_new = labels[1]
+		elif len(labels) == 1:
+			label_objects_new = labels
 		
+		if label_objects_new:
+			label_objec.update(label_objects_new)
+
 		## store object for movie
 		f = 1
 		cmd.frame(f)
 		cmd.mview('store', object=chainname)
-		# best_view('all', 'chain', '10')
-		cmd.mview('store', object="_label" + chainname)
-		
-		## calculate and save COM of chain
-		if typeOfExplosion == 'com':
-			chainsCOMS[chainname] = calc_COM(chainname)
+		cmd.mview('store', object="label" + chainname)
+		cmd.show('dashes')
 		
 		## create objects for ligands
 		if storedLigands:
@@ -179,44 +190,50 @@ def create_objects(chains, selected, storedLigands, chainAndLigand = None, typeO
 				## select ligand on chain	
 				selection = chainname + ' & resn ' + l
 				
-				if typeOfExplosion == 'com':
-					get_ligand_chain_pair(l, selection, chainname, 
+				label_objec_new = get_ligand_chain_pair(l, selection, chainname, 
 										chainAndLigand, ligandAndChain, 
-										ligandsCOMS, COM = True)
-				else: 
-					get_ligand_chain_pair(l, selection, chainname, 
-										chainAndLigand, ligandAndChain)
+										 complexXYZ, dim, label_objec, ligandsCOMS)
+				if label_objects_new:
+					label_objec.update(label_objects_new)
 		
 		## if there is no ligand on chain, just keep chain and its label
 		if not chainAndLigand[chainname]:
 			if chainname in chainAndLigand: del chainAndLigand[chainname]
-			cmd.group(chainname + "_", chainname + " and " + "_label" \
-						+ chainname)
-	best_view('all', 'chain', '10')
-	cmd.mview('store')					
+			cmd.group(chainname + "_", chainname + " " + "label" \
+						+ chainname + " " + label_objec[chainname][0])
+	view_objects = " "
+	for obj in cmd.get_names('objects'):
+		if not obj.startswith('_') and not obj.startswith('label'):
+			view_objects += obj + " "
+	
+	best_view(view_objects, 'chain', '10')
+	cmd.zoom('all', complete=1)
+	cmd.mview('store')	
+	
+	## show labels
+	show_labels(label_objec)
+	cmd.scene('on', 'store')
+	cmd.zoom('all', complete=1)
+	cmd.mview('store', scene='on')
+	
 	f = f + 20
 	cmd.frame(f)
 	## store chain objects for movie 
-	# best_view('all', 'chain', '10')
 	store_view(group = True, all = True)
-	f = f + 1
 	
 	## hide labels
-	cmd.hide('labels')
-	cmd.scene('off', 'store')
+	f = f + 1
 	cmd.frame(f)
+	cmd.hide('labels')
+	cmd.hide('dashes')
+	cmd.scene('off', 'store')
+	cmd.zoom('all',complete=1)
 	cmd.mview('store', scene='off')
-	
-	
 
-		
-	if typeOfExplosion == 'com':
-		return cNames, chainAndLabel, chainAndLigand, ligandAndChain, ligandsCOMS, chainsCOMS, f
-	else:
-		return cNames, chainAndLabel, chainAndLigand, ligandAndChain, f
+	return cNames, chainAndLabel, chainAndLigand, ligandAndChain, ligandsCOMS, chainsCOMS, f, label_objec
 
 def get_ligand_chain_pair(l, selection, chainname, chainAndLigand, 
-							ligandAndChain, ligandsCOMS = None, COM = False):
+							ligandAndChain, complexXYZ, dim, label_objects, ligandsCOMS = None):
 	'''DESCRIPTION:
 		get pair of ligand and respective chain''' 
 	
@@ -226,64 +243,179 @@ def get_ligand_chain_pair(l, selection, chainname, chainAndLigand,
 		cmd.extract(ligandname, selection)
 		cmd.show('spheres', ligandname)
 		
-		## label ligands			
-		label_obj(ligandname)
+		## calculate COM of ligand
 		
-		if COM:
-			## calculate COM of ligand
-			ligandsCOMS[ligandname] = calc_COM(ligandname)
+		ligandsCOMS[ligandname] = calc_COM(ligandname)
+		
+		ligandCOM = ligandsCOMS[ligandname]
+		## label ligands			
+		label_objects_new = label_obj(ligandname, ligandCOM, complexXYZ, dim)
 		
 		## color binding site
 		color_binding(chainname, ligandname)
 		
 		## group chains and respective ligands to translate  
 		## them together at first (including their labels)
-		if COM:
-			cmd.group(chainname + "_" + l + "_", 
-						chainname + " " + ligandname + " " + "_label" + \
-						chainname + " " + "_label" + ligandname)
-			chainAndLigand[chainname].append(chainname + "_" + l + "_")
-		else:
-			## group chains and respective ligands to translate  
-			## them together at first (including their labels)
-			cmd.group(chainname + "_", 
-						chainname + " " + ligandname + " " + "_label" + \
-						chainname + " " + "_label" + ligandname)
-			chainAndLigand[chainname].append(ligandname)
-			
+		cmd.group(chainname + "_" + l + "_", 
+						chainname + " " + ligandname + " " + "label" + \
+						chainname + " " + "label" + ligandname + " " + \
+						label_objects_new[ligandname][0] + " " + \
+						label_objects[chainname][0])
+		chainAndLigand[chainname].append(chainname + "_" + l + "_")
+
+		label_objects.update(label_objects_new)
 		ligandAndChain[ligandname] = chainname  
+		return label_objects
 		
-def label_obj(chainname, chainAndLabel = None):
+def calc_label_positions_circular(chainCOM, complexXYZ, dim):
+	''' DESCRIPTION:
+		set labels on sphere around complex object with connection line to com
+		of according chain/ligand
+	'''
+	
+	min = dim[0]
+	max = dim[1]
+	R = math.sqrt((min[0]-max[0])**2 + (min[1]-max[1])**2 + (min[2]-max[2])**2) #euclidean
+	
+	P1 = chainCOM
+	P2 = complexXYZ
+	x0 = P1[0]
+	y0 = P1[1]
+	z0 = P1[2]
+	x1 = P2[0]
+	y1 = P2[1]
+	z1 = P2[2]
+	dx = x1 - x0
+	dy = y1 - y0
+	dz = z1 -  z0 
+	cx = P2[0]
+	cy = P2[1]
+	cz = P2[2]
+	
+	a = dx*dx + dy*dy + dz*dz
+	b = 2*dx*(x0-cx) +  2*dy*(y0-cy) +  2*dz*(z0-cz)
+	c = cx*cx + cy*cy + cz*cz + x0*x0 + y0*y0 + z0*z0 +-2*(cx*x0 + cy*y0 + cz*z0) - R*R
+	
+	discriminant = b**2 - 4*a*c
+	
+	t = (-b-math.sqrt(discriminant))/(2*a)
+	
+	x = x0 + t*dx                 
+	y = y0 + t*dy                 
+	z = z0 + t*dz
+	
+	n1 = ''.join(map(str,P1))
+
+	cmd.pseudoatom('_pt1' + n1, pos=P1)
+	cmd.pseudoatom('_pt2' + n1, pos=[x,y,z])
+	cmd.hide('nonbonded', "_pt1" + n1)
+	cmd.hide('nonbonded', "_pt2" + n1)
+	cmd.distance('_pt1_' + n1 + '_pt2_' + n1, '_pt1' + n1, '_pt2' + n1)
+	f = 1
+	cmd.frame(f)
+	cmd.hide('labels', '_pt1_' + n1 + '_pt2_' + n1)
+	cmd.mview('store', object='_pt1_' + n1 + '_pt2_' + n1)
+	return [x,y,z], ['_pt1_' + n1 + '_pt2_' + n1]
+		
+def calc_label_position_flush(chains, transVec, f):
+	chainsCOMS = {}
+	## Determine the extents of empty space regions,
+	## Determine the positions of anchor points,
+	size = {}
+	for ch in chains:
+		chainsCOMS[ch] = calc_COM(ch)
+		size[ch] = cmd.count_atoms(ch)
+	maxChain = max(size, key=size.get)
+	
+	maxdim = cmd.get_extent(maxChain)
+	cmd.pseudoatom('_min'+maxChain, pos=maxdim[0])
+	cmd.hide('nonbonded', '_min'+maxChain)
+	cmd.pseudoatom('_max'+maxChain, pos=maxdim[1])
+	cmd.hide('nonbonded', '_max'+maxChain)
+	labellength = cmd.get_distance('_min'+maxChain,'_max'+maxChain)
+	
+	## Choose a pivot point
+	mean_xpos = sum(chainsCOMS[ch][0]for ch in chainsCOMS.keys()) / len(chainsCOMS)
+	
+	mean_ypos = sum(chainsCOMS[ch][1] for ch in chainsCOMS.keys()) / len(chainsCOMS)
+	
+	mean_zpos = sum(chainsCOMS[ch][2] for ch in chainsCOMS.keys()) / len(chainsCOMS)
+	
+	cmd.pseudoatom('_mean', pos=[mean_xpos,mean_ypos,mean_zpos])
+	cmd.hide('nonbonded', '_mean')
+
+	## Assign labels to the left and right region by comparing
+	## their anchors with the pivot point.
+	for ch in chainsCOMS:
+		cmd.pseudoatom('_com_' + ch, pos = chainsCOMS[ch])
+		cmd.hide('nonbonded', '_com_' + ch)
+		
+		if transVec[0] > 0 and transVec[1]:
+			x_pos = chainsCOMS[ch][0]
+			y_pos = chainsCOMS[ch][1]
+			if chainsCOMS[ch][2] > mean_zpos:
+				z_pos = chainsCOMS[ch][2] + labellength*1.5
+			else:
+				z_pos = chainsCOMS[ch][2] - labellength*1.5
+			
+		elif transVec[1] > 0 and transVec[2] > 0:
+			y_pos = chainsCOMS[ch][1]
+			z_pos = chainsCOMS[ch][2]
+			if chainsCOMS[ch][0] > mean_xpos:
+				x_pos = chainsCOMS[ch][0] + labellength*1.5
+			else:
+				x_pos = chainsCOMS[ch][0] - labellength*1.5
+				
+		elif transVec[2] > 0 and transVec[0] > 0:
+			x_pos = chainsCOMS[ch][0]
+			z_pos = chainsCOMS[ch][2]
+			if chainsCOMS[ch][1] > mean_ypos:
+				y_pos = chainsCOMS[ch][1] + labellength*1.5
+			else:
+				y_pos = chainsCOMS[ch][1] - labellength*1.5
+
+		cmd.pseudoatom('_'+ch+'_pos', pos = [x_pos, y_pos, z_pos])
+		cmd.distance('_'+ch + '_label','_'+ch+'_pos', '_com_' + ch)
+		cmd.hide('nonbonded', '_'+ch+'_pos')	
+		cmd.frame(f)
+		cmd.pseudoatom('_newlabel' + ch, pos = [x_pos, y_pos, z_pos])
+		cmd.label("_newlabel" + ch, "'%s'" %ch.split('_')[-1])
+		cmd.hide('labels', '_'+ch + '_label')
+					
+def label_obj(chainname, chainCOM, complexXYZ, dim, chainAndLabel = None):
 	'''DESCRIPTION:
 		create an label for given chain (if chainAndLabel set) or ligand  
 	'''
-	## create pseudoatom at corner of boundingbox of object to be labeled
-	dim = cmd.get_extent(chainname)
-	cmd.pseudoatom("_label" + chainname, pos=dim[0])
+	## create pseudoatom for object to be labeled
+	label_pos, lab_obj = calc_label_positions_circular(chainCOM, complexXYZ, dim)
+	
+	cmd.pseudoatom("label" + chainname, pos=label_pos)
 	
 	## label ligand
 	if not chainAndLabel:
 		ligName = chainname.split("_")[-1]
-		cmd.label("_label" + chainname, "'%s'" %ligName)
+		cmd.label("label" + chainname, "'%s'" %ligName)
 		
 	## label chain
 	else:
-		cmd.label("_label" + chainname, "'%s'" %chainname)
+		cmd.label("label" + chainname, "'%s'" %chainname)
 		
 	## save label of chain in dictonary
 	if chainAndLabel:
-		chainAndLabel[chainname] = "_label" + chainname
+		chainAndLabel[chainname] = "label" + chainname
 		
 	## store ligand label in movie
 	if not chainAndLabel:
-		cmd.mview('store', object = "_label" + chainname)
+		cmd.mview('store', object = "label" + chainname)
 		
 	## hide pseudoatom represantation
-	cmd.hide('nonbonded', "_label" + chainname)
+	cmd.hide('nonbonded', "label" + chainname)
 	
 	## return dictionary of chain and its label
 	if chainAndLabel:
-		return chainAndLabel
+		return [chainAndLabel, {chainname : lab_obj}]
+	else:
+		return {chainname : lab_obj}
 	
 def color_binding(chainname, ligandname, res = False):
 	''' DESCRIPTION:
@@ -334,7 +466,17 @@ def isColliding(sel1, sel2):
 					(z_min1 <= z_max2 and z_max1 >= z_min2)
 
 	return isColliding
-	
+
+def best_view_objects():
+	'''DESCRIPTION: 
+		return sting of all objects condsidered for best_view calulation 
+	'''
+	view_objects = " "
+	for obj in cmd.get_names('objects'):
+			if not obj.startswith('_') and not obj.startswith('label'):
+				view_objects += obj + " "
+	return view_objects
+				
 def translate_selection(originXYZ, transXYZ, transname, factor = 1, f = 1, group = None):
 	''' DESCRIPTION:
 		translate an object relative to complex of origin using center of mass
@@ -374,19 +516,19 @@ def com_translation(cname, chainAndLigand, complexXYZ, chainXYZ, transFac, f):
 		translate_selection(complexXYZ, chainXYZ, cname + "_", transFac,f, 
 								cname + "_")
 
-def canonical_tranlation(ch, i, transVec, chainAndLigand):
+def canonical_tranlation(ch, i, transVec, chainAndLigand, label_objects):
 	'''DESCRIPTION:
 		translate chain ch canonical
 	'''
-	cmd.translate( [x * i for x in transVec] , object=ch)
-	cmd.translate([x * i for x in transVec], 
-					object="_label" + ch)
+	## if chain contains ligand, translate ligand also
 	if ch in chainAndLigand.keys():
 		for l in chainAndLigand[ch]:
-			cmd.translate([x * i for x in transVec], object=l)
-			cmd.translate([x * i for x in transVec], object="_label" + l)
-	cmd.mview('store', object = ch+"_")
-	cmd.mview('interpolate', object = ch+"_")
+			cmd.translate([x * i for x in transVec], object=l, camera=0)
+	## only chain has to be translated
+	else:
+		cmd.translate([x * i for x in transVec], object=ch + "_", camera=0)
+		cmd.mview('store', object = ch+"_")
+		cmd.mview('interpolate', object = ch+"_")
 		
 def store_view(obj = None, group = False, all = True):
 	''' DESCRIPTION:
@@ -423,8 +565,17 @@ def store_res_view(selected, f, resis = None, orient = False, all = False):
 	if not resis:
 		if all:
 			store_view(selected, all)
+
+def show_labels(label_objects):
+	cmd.show('labels')
+	for l in label_objects.values():
+		if type(l) is list:
+			cmd.hide('labels', l[0])
+		else:
+			cmd.hide('labels', l)
+	cmd.show('dashes')
 	
-def com_explosion(selected, cNames = None, chainAndLabel = None, 
+def com_explosion(selected, label_objects, cNames = None, chainAndLabel = None, 
 					chainAndLigand = None, ligandAndChain = None, 
 					chainsCOMS = None, complex = None, com = None, 
 					storedLigands = None, ligandsCOMS = None, transFac = None,
@@ -456,7 +607,7 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 		
 		## COM of chain
 		chainXYZ = chainsCOMS[chainname]
-
+		
 		## only translate chain if there are multiple chains
 		if len(cNames) > 1:	
 			## translate chains and ligands
@@ -476,11 +627,8 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 		## if only one chain is selected, translate it and its ligand
 		else:
 			cmd.frame(f)
-			cmd.zoom(chainname)
+			cmd.zoom(selected)
 			store_view(chainname + '_')
-			
-			f = f + 30
-			cmd.frame(f)
 			
 			## if source complex is known use its COM to translate
 			if complex:
@@ -494,36 +642,27 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 					cmd.translate([transFac, transFac, transFac], 
 										object = chainname + "_")
 										
-			store_view(chainname + '_', all = True)
-					
-			## store objects for movie
-			f = f + 30
-			cmd.frame(f)
-			store_view(chainname + '_', all = True)
+			store_view(chainname + '_')
 
 	## store objects for movie
-	f = frame + 30
-	# if not ligandAndChain:
-		# cmd.frame(f)
-		# best_view('all', 'chain', '10')
-		# store_view(group=True, all = True)
-
-	# else:
+	f = f + 30
 	cmd.frame(f)
-	best_view('all', 'chain', '10')
+	if not ligandAndChain:
+		cmd.frame(f)
+		show_labels(label_objects)
+		cmd.scene('on2', 'store')
+		cmd.mview('store', scene='on2')
+		view_objects = best_view_objects()
+		best_view(view_objects, 'chain', '10')
+	if len(cNames) == 1:
+		best_view(selected, 'chain', '10')
+		cmd.zoom('all', complete=1)
 	store_view(group=True, all = True)
-	
-	# if len(cNames) == 1:
-		# cmd.frame(f)
-		# best_view(selected, 'chain', '10')
-		# cmd.zoom('all')
-		# store_view(group=True, all = True)
 
 	''' translate ligands '''
 	if ligandAndChain:
 		f = f + 30
 		cmd.frame(f)
-
 		for ligand in ligandAndChain.keys():
 			cXYZ = chainsCOMS[ligandAndChain[ligand]]
 			ligandXYZ = ligandsCOMS[ligand]
@@ -539,30 +678,44 @@ def com_explosion(selected, cNames = None, chainAndLabel = None,
 									transFac, f, 
 									chainAndLigand[ligandAndChain[ligand]])
 				translate_selection(cXYZ, ligandXYZ, 
-										"_label" + ligand, 
+										"label" + ligand, 
 										transFac, f, 
 										chainAndLigand[ligandAndChain[ligand]])
+				translate_selection(cXYZ, ligandXYZ, 
+										label_objects[ligand], 
+										transFac, f)
+				translate_selection(cXYZ, ligandXYZ, 
+										label_objects[ligand][0], 
+										transFac, f)
 				if complex:
 					condition = isColliding(ligand, complex) \
 							or isColliding(ligand, ligandAndChain[ligand])
 				else:
 					condition = isColliding(ligand, ligandAndChain[ligand])
-
-		f = f + 10
+		cmd.frame(f+1)
+		cmd.show('labels')
+		for l in label_objects.values():
+			if type(l) is list:
+				cmd.hide('labels', l[0])
+			else:
+				cmd.hide('labels', l)
+		cmd.show('dashes')
+		cmd.scene('on2', 'store')
+		cmd.mview('store', scene='on2')
+		
+		f = f + 30
 		## show labels
-		# cmd.show('labels')
-		# cmd.scene('on', 'store')
-		# cmd.frame(f)
-		# cmd.mview('store', scene='on')
-		# cmd.mview('reinterpolate')
-
-		f = f + 20
 		cmd.frame(f)
-		best_view('all', 'chain', '10')
+		view_objects = " "
+		if len(cNames) > 1:
+			for obj in cmd.get_names('objects'):
+				if not obj.startswith('_') and not obj.startswith('label'):
+					view_objects += obj + " "
+			best_view(view_objects, 'chain', '10')
 		store_view(group=True, all = True)
 	return f
 
-def canonical_explosion(selected, cNames = None, chainAndLabel = None, 
+def canonical_explosion(selected, label_objects, chainsCOMS, ligandsCOMS, cNames = None, chainAndLabel = None, 
 					chainAndLigand = None, ligandAndChain = None, complex = None,
 					storedLigands = None, transVec = None, frame = 1):
 	'''DESCRIPTION: translate a selection in canonical direction and create
@@ -578,7 +731,7 @@ def canonical_explosion(selected, cNames = None, chainAndLabel = None,
 		for chain in cNames:
 			while isColliding(chain, complex):
 				for ch in cNames:
-					canonical_tranlation(ch, i, transVec, chainAndLigand)
+					canonical_tranlation(ch, i, transVec, chainAndLigand, label_objects)
 					i += 1
 	else:
 		for chain in cNames:
@@ -586,24 +739,22 @@ def canonical_explosion(selected, cNames = None, chainAndLabel = None,
 				if c != chain:
 					while isColliding(chain, c):
 						for ch in cNames[1:]:
-							canonical_tranlation(ch, i, transVec, chainAndLigand)
+							canonical_tranlation(ch, i, transVec, chainAndLigand, label_objects)
 							i += 1
-
-	best_view('all', 'chain', '10')			
+	
 	store_view(group = True, all = True)
 	
 	f = f + 30
-	# if not ligandAndChain:
-		# ## show labels
-		# # cmd.show('labels')
-		# # cmd.scene('on', 'store')
-		# cmd.frame(f)
-		# # cmd.mview('store', scene='on')
-		# store_view(group=True, all = True)
-
-	# else:
 	cmd.frame(f)
-	best_view('all', 'chain', '10')
+	if not ligandAndChain:
+		calc_label_position_flush(chainsCOMS.keys(), transVec, f)
+		for obj in cmd.get_names('objects'):
+			if obj.startswith('_pt1_'):
+				cmd.hide('dashes', obj)
+				cmd.hide('labels', obj)
+		cmd.scene('on2', 'store')
+		cmd.mview('store', scene='on2')
+
 	store_view(group=True, all = True)
 		
 	''' translate ligands'''
@@ -613,19 +764,32 @@ def canonical_explosion(selected, cNames = None, chainAndLabel = None,
 		for ligand in ligandAndChain.keys():
 			while isColliding(ligand, ligandAndChain[ligand]):
 				cmd.translate([x * 1/4  for x in transVec], object=ligand)
-				cmd.translate([x * 1/4 for x in transVec], object="_label" + ligand)
+				cmd.translate([x * 1/4 for x in transVec], object="label" + ligand)
+				cmd.translate([x * 1/4 for x in transVec], object=label_objects[ligand][0])
 			store_view(group = True, all = True)
-			
+		
+		cmd.frame(f+1)
+		chainslist = chainsCOMS.keys()
+		ligandslist = ligandsCOMS.keys()
+		chainslist.extend(ligandslist)
+		calc_label_position_flush(chainslist, transVec, f+1)
+		for obj in cmd.get_names('objects'):
+			if obj.startswith('_pt1_'):
+				cmd.hide('dashes', obj)
+				cmd.hide('labels', obj)
+		cmd.scene('on2', 'store')
+		cmd.mview('store', scene='on2')
+		
 		f = f + 30
-		## show labels
-		# cmd.show('labels')
-		# cmd.scene('on', 'store')
 		cmd.frame(f)
-		# cmd.mview('store', scene='on')
-		cmd.mview('reinterpolate')
-		best_view('all', 'chain', '10')
 		store_view(group=True, all = True)
-					
+	f = f + 1
+	cmd.frame(f)
+	cmd.scene('on')
+	cmd.zoom('all', complete=1)
+	cmd.mview('store', scene='on')
+	store_view(all=True)
+
 	return f
 	
 def explosion(selected = [], typeOfExplosion = 'com', complex = None):
@@ -651,6 +815,10 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 	cmd.remove('solvent')
 	cmd.hide('all')
 	
+	cmd.set('dash_color', 'marine')
+	cmd.set('dash_round_ends', 'off')
+	cmd.set('dash_width', 1)
+	cmd.set('dash_gap', 0)
 	
 	if complex:
 		cmd.show('surface', complex)
@@ -662,7 +830,7 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 		if len(selected) > 1:
 			initialize_movie(frames = str(130*len(selected)+100))
 		else:
-			initialize_movie(frames = str(180))
+			initialize_movie(frames = str(200))
 		
 		## get ligands
 		storedLigands = get_ligands()
@@ -675,11 +843,12 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 		chainAndLigand = {}
 		ligandAndChain = {}
 		chainsAndObj = {}
+		label_objects = {}
 		
-		if typeOfExplosion == 'com':
-			coms = {}
-			ligandsCOMS = {}
-			chainsCOMS = {}
+		## calc coms for com-explosion and labeling
+		coms = {}
+		ligandsCOMS = {}
+		chainsCOMS = {}
 		
 		for obj in selected:
 			if typeOfExplosion == 'com':
@@ -689,28 +858,30 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 			
 		if not complex:	
 			cmd.create('_all_obj', s)
-			
+			dim = cmd.get_extent('_all_obj')
+			complexXYZ = calc_COM('_all_obj')
 			if typeOfExplosion == 'com':
 				## calc com of complex from objects
-				complexXYZ = calc_COM('_all_obj')
 				trans = calcTransFac('_all_obj')
 			else:
 				## calculate translation vector
 				transVec = transAxes('_all_obj') 
-				print transVec
+				print "Translation vector:", transVec
 			cmd.frame(1)
 			cmd.mview('store')
 			cmd.delete('_all_obj')
 				
 		else:
+			dim = cmd.get_extent(complex)
+			complexXYZ = calc_COM(complex)
 			if typeOfExplosion == 'com':
 				## calc com of complex from objects
-				complexXYZ = calc_COM(complex)
 				trans = calcTransFac(complex)
+				
 			else:
 				## calculate translation vector
 				transVec = transAxes(complex) 
-				print transVec
+				print "Translation vector:",transVec
 			
 		for obj in selected:
 			##get chains of complex
@@ -719,14 +890,10 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 				chainsAndObj[obj+ '_chain' + ch] = obj
 				chainAndLigand[obj+ '_chain' + ch] = []
 				
-			if typeOfExplosion == 'com':
-				## create objects for all chains and ligands
-				cNames_new, chainAndLabel_new, chainAndLigand_new, ligandAndChain_new, ligandsCOMS_new, chainsCOMS_new, f= \
-								create_objects(chains[obj], obj, storedLigands, chainAndLigand)
-			else:
-				cNames_new, chainAndLabel_new, chainAndLigand_new, ligandAndChain_new, f= \
-								create_objects(chains[obj], obj, storedLigands, chainAndLigand, typeOfExplosion = 'canonical')
-		
+			## create objects for all chains and ligands
+			cNames_new, chainAndLabel_new, chainAndLigand_new, ligandAndChain_new, ligandsCOMS_new, chainsCOMS_new, f, label_objects_new= \
+								create_objects(chains[obj], obj, storedLigands, chainsCOMS, complexXYZ, dim, chainAndLigand)
+
 			cNames = cNames + cNames_new
 			if chainAndLabel_new:
 				chainAndLabel.update(chainAndLabel_new)
@@ -734,13 +901,13 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 				chainAndLigand.update(chainAndLigand_new)
 			if ligandAndChain_new:
 				ligandAndChain.update(ligandAndChain_new)
-				
-			if typeOfExplosion == 'com':
-				if ligandsCOMS_new:
-					ligandsCOMS.update(ligandsCOMS_new)
-				if chainsCOMS_new:
-					chainsCOMS.update(chainsCOMS_new)
-	
+			if label_objects_new:
+				label_objects.update(label_objects_new)
+			if ligandsCOMS_new:
+				ligandsCOMS.update(ligandsCOMS_new)
+			if chainsCOMS_new:
+				chainsCOMS.update(chainsCOMS_new)
+			
 		f = f + 30		
 		if len(selected) > 1:
 			if typeOfExplosion == 'canonical':
@@ -803,7 +970,7 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 			## translation of object
 			if typeOfExplosion == 'com':
 				if not complex:
-					f = com_explosion('_'+obj, cNames = objChains,
+					f = com_explosion('_'+obj, label_objects,cNames = objChains,
 								chainAndLabel = chainAndLabel, 
 								chainAndLigand = chainAndLigand, 
 								ligandAndChain = ligandAndChain_obj, 
@@ -812,7 +979,7 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 								transFac = trans, ligandsCOMS = ligandsCOMS,
 								frame = f)
 				else:
-					f = com_explosion('_'+obj, cNames = objChains,
+					f = com_explosion('_'+obj, label_objects,cNames = objChains,
 								chainAndLabel = chainAndLabel, 
 								chainAndLigand = chainAndLigand, 
 								ligandAndChain = ligandAndChain_obj, 
@@ -822,14 +989,14 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 								frame = f)
 			else:
 				if complex:
-					f = canonical_explosion('_'+obj, cNames = objChains,
+					f = canonical_explosion('_'+obj, label_objects, chainsCOMS, ligandsCOMS, cNames = objChains,
 							chainAndLabel = chainAndLabel, 
 							chainAndLigand = chainAndLigand, 
 							ligandAndChain = ligandAndChain_obj, complex = complex,
 							storedLigands = storedLigands, transVec = trans,
 							frame = f)
 				else:
-					f = canonical_explosion('_'+obj, cNames = objChains,
+					f = canonical_explosion('_'+obj, label_objects, chainsCOMS, ligandsCOMS, cNames = objChains,
 							chainAndLabel = chainAndLabel, 
 							chainAndLigand = chainAndLigand, 
 							ligandAndChain = ligandAndChain_obj, 
@@ -838,17 +1005,7 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 				
 				
 			cmd.delete('_'+obj)
-	
-	numframes = cmd.count_frames()
-	cmd.frame(f)
-	## show labels
-	cmd.show('labels')
-	cmd.scene('on', 'store')
-	cmd.mview('store', scene='on')
-	# cmd.frame(numframes)
-	# best_view('all', 'chain', '10')
-	# store_view(group=True, all = True)
-	# cmd.mview('store')
+
 	print 'Explosion of', selected, time.clock() - start_time, 'seconds'
 			
 def relabel(selected, newLabel="new label"):
@@ -859,7 +1016,7 @@ def relabel(selected, newLabel="new label"):
 	x = ''
 	
 	## relabel label
-	cmd.label("_label" + selected , "'%s'" %newLabel )
+	cmd.label("label" + selected , "'%s'" %newLabel )
 	
 	## rename all objects of selection
 	for o in obj:
