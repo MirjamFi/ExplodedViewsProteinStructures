@@ -153,8 +153,10 @@ def create_objects(chains, selected, storedLigands, chainsCOMS, complexXYZ, dim,
 	objColor = {}
 	
 	for c in chains:	
-		## color each chain individually
+		## color each chain individually (red is color for binding site)
 		col = get_colors.get_random_color()
+		while col in objColor.values() or col in ('red','white', 'black'):
+			col = get_colors.get_random_color()
 		cmd.color(col, selected + '& chain ' + c) 
 					
 		## create object for chain with name
@@ -898,7 +900,7 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 		## color binding site
 		for cl in chainAndLigand.iteritems():
 			for l in cl[1]:
-				color_binding(cl[0], l)
+				color_binding(cl[0], l[:-1])
 		## set best view
 		cmd.frame(f)
 		view_objects = best_view_objects()
@@ -1054,13 +1056,13 @@ def explosion(selected = [], typeOfExplosion = 'com', complex = None):
 			cmd.mview('store', scene='on2')
 			
 		else:
-			cmd.frame(f-29)
+			cmd.frame(f-30)
 			show_labels(label_objects)
 			cmd.scene('on2', 'store')
 			cmd.mview('store', scene='on2')
 			cmd.zoom('all', complete=1)
 			cmd.mview('store', object='all')
-			cmd.frame(f+1)
+			cmd.frame(f)
 			cmd.mview('store', scene='on2')
 			view_objects =best_view_objects()
 			best_view(view_objects, 'chain', '10')
