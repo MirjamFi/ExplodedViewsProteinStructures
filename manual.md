@@ -17,13 +17,20 @@ complex to make sure the part is not translated into the object.
 in the modules of PyMOL.
 
 ###USAGE:
-explosion(list of objects, [type of explosion [,complex]])
+
+explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cutoff [,colorBinding]]]]]]
 
 ###ARGUMENTS:
-- list of objects: 	list of strings 	Objects' names to explode
-- type of explosion: 	string 				'com'(default) or 'canonical'
-- complex:			string				Name of object relative to the part of molecule which shall be translated
-
+- selected: 	names of objects to explode
+- typeOfExplosion: 	'com'(default) or 'canonical'
+- complex:	Name of object relative to the part of molecule which shall be translated
+- removeSolvents: boolean (default: true), removes all solvents and ligands with occurance bigger than cutoff value
+- exclude: 3-letter code of ligand which shall not be removed (if occurance is known to be bigger than cutoff)
+- cutoff: default: 10, occurance in PDB in total
+- colorBinding:
+ - individual (default): each chain has an individual color, binding sites are colored by the colors of according chains
+ - gray: all chains are colored gray, each binding site is colored individually
+ - none: no color is changed
 
 ###EXAMPLES:
 ```python
@@ -31,26 +38,23 @@ explosion(list of objects, [type of explosion [,complex]])
 	run explosion_movie.py
 ```
 ```python
+	reinitialize
 	# load molecule in PyMOL:
 	fetch 3oaa, type='pdb1'
-
-	# run explosion_movie.py from absolute directory:
-	run C:/.../explosion_movie.py
-
-	# either explode complete molecule:
-	explosion(['3oaa'])
+	# either explode complete molecule with default values:
+	explosion 3oaa
 	```
-![](images/3oaa_complete_start.png)
+![](images/3oaa_individual_start.png)
 
-![](images/3oaa_complete.png)
-
-![](images/3oaa_complete_end.png)
+![](images/3oaa_individual_end.png)
 
 ```python
-	# or parts of it:
-	create ABCDEF, chain A chain B chain C chain D chain E chain F
-	create GH, chain G chain H
-	explosion(['ABCDEF','GH'])
+	# or parts of it, e.g. with colorBinding=gray:
+	reinitialize
+	fetch 3oaa, type='pdb1'
+	extract AA, chain A chain B chain C chain D chain E chain F
+	extract BB, chain G chain H
+	explosion AA BB, colorBinding = gray
 ```
 ![](images/3oaa_parts_start.png)
 
@@ -59,15 +63,17 @@ explosion(list of objects, [type of explosion [,complex]])
 ![](images/3oaa_parts_2.png)
 
 ![](images/3oaa_parts_end.png)
+
 ```python
-	# or explode canonical:
-	explosion(['3oaa'], 'canonical')
+	# or explode canonical without and canonical:
+	explosion 3oaa, typeOfExplosion = canonical, colorBinding = none
 ```
 ![](images/3oaa_canonical_start.png)
 
 ![](images/3oaa_canonical_end.png)
 
 ```python
+  reinitialize
 	# load multiple symmetry operators
 	fetch 3oaa
 
@@ -75,27 +81,30 @@ explosion(list of objects, [type of explosion [,complex]])
 	cmd.set('ignore_case', 'off')
 
 	# create object for every symmetry unit
-	create mol1, chain A chain B chain  C chain D chain  E chain F chain G chain  H
-	create mol2, chain I chain J chain  K chain L chain  M chain N chain O chain  P
-	create mol3, chain Q chain R chain  S chain T chain  U chain V chain W chain  X
-	create mol4, chain Y chain Z chain  a chain b chain  c chain d chain e chain  f
+	extract mol1, chain A chain B chain  C chain D chain  E chain F chain G chain  H
+	extract mol2, chain I chain J chain  K chain L chain  M chain N chain O chain  P
+	extract mol3, chain Q chain R chain  S chain T chain  U chain V chain W chain  X
+	extract mol4, chain Y chain Z chain  a chain b chain  c chain d chain e chain  f
 
-	explosion(['mol1', 'mol2', 'mol3', 'mol4'])
+	explosion mol1 mol2 mol3 mol4
 ```
 ![](images/3oaa_multi_start.png)
 
 ![](images/3oaa_multi1.png)
 
+![](images/3oaa_multi2.png)
+
 ![](images/3oaa_multi_end.png)
 
 ```python
+    reinitialize
 	# portein with multiple states:
 	fetch 5k7l, type=pdb1
 
 	# create object for every state
 	split_states 5k7l
-
-	explosion(['5k7l_0001', '5k7l_0002', '5k7l_0003', '5k7l_0004'])
+    remove 5k7l
+    explosion 5k7l_0001 5k7l_0002 5k7l_0003 5k7l_0004, colorBinding = gray
 ```
 ![](images/5k7l_start.png)
 
@@ -108,10 +117,20 @@ explosion(list of objects, [type of explosion [,complex]])
 	fetch 3oaa, type = pdb1
 
 	# create object for part or molecule
-	extract chainA, chain A
+	create chainA, chain A
 
-	explosion(['chainA'], 'com', '3oaa')
+	explosion chainA, complex = 3oaa, colorBinding = gray
 ```
 ![](images/chain_start.png)
 
 ![](images/chain_end.png)
+
+```python
+  # exclude known detergents from removing
+  reinitialize
+  fetch 5k7l
+  explosion 5k7l, exclude = Y01 NAG
+```
+![](images/5k7l_det_start.png)
+
+![](images/5k7l_det_end.png)
