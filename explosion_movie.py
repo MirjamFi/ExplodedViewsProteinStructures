@@ -53,7 +53,8 @@ def remove_solvents(exclude, cutoff, storedLigands = None):
 	
 	if not os.path.exists('./cc-counts.tdd'):
 		import urllib
-		urllib.urlretrieve ("http://ligand-expo.rcsb.org/dictionaries/cc-counts.tdd", "cc_counts.tdd")
+		urllib.urlretrieve ("http://ligand-expo.rcsb.org/dictionaries/cc-counts.tdd", 
+								"cc_counts.tdd")
 	if not os.path.exists('./cc-counts.tdd'):
 		sys.exit('Could not download http://ligand-expo.rcsb.org/dictionaries/cc-counts.tdd, please try manually.')
 	
@@ -69,10 +70,12 @@ def remove_solvents(exclude, cutoff, storedLigands = None):
 			if row[0] != 'id':
 				ligand = row[0]
 				ligcount = int(row[1])
-				if ligcount > cutoff and not ligand in aa and not ligand in ['ADP', 'ANP'] and not ligand in exclude:
-					cmd.remove('resn ' + ligand)
-					if storedLigands and ligand in storedLigands:
-						storedLigands.discard(ligand)
+				if ligcount > cutoff and not ligand in aa and \
+					not ligand in ['ADP', 'ANP']:
+					if not exclude or ligand not in exclude:
+						cmd.remove('resn ' + ligand)
+						if storedLigands and ligand in storedLigands:
+							storedLigands.discard(ligand)
 			
 def get_ligands():
 	''' DESCRIPTION:
@@ -432,7 +435,8 @@ def label_obj(chainname, chainCOM, complexXYZ, dim, chainAndLabel = None):
 		create an label for given chain (if chainAndLabel set) or ligand  
 	'''
 	## create pseudoatom for object to be labeled
-	label_pos, lab_obj = calc_label_positions_circular(chainname, chainCOM, complexXYZ, dim)
+	label_pos, lab_obj = calc_label_positions_circular(chainname, chainCOM, 
+																complexXYZ, dim)
 	
 	cmd.pseudoatom("label" + chainname, pos=label_pos)
 	
@@ -578,7 +582,8 @@ def best_view_objects(label = False):
 					view_objects += obj + " "
 	return view_objects
 				
-def translate_selection(originXYZ, transXYZ, transname, factor = 1, f = 1, group = None):
+def translate_selection(originXYZ, transXYZ, transname, factor = 1, f = 1, 
+																group = None):
 	''' DESCRIPTION:
 		translate an object relative to complex of origin using center of mass
 	'''
@@ -608,14 +613,16 @@ def com_translation(cname, chainAndLigand, complexXYZ, chainXYZ, transFac, f):
 	'''DESCRIPTION:
 		translate chain via COM
 	'''		
+	translate_selection(complexXYZ, chainXYZ, cname + '_', transFac, f, cname + "_")
 	## if chain contains ligand, translate ligand also
 	if cname in chainAndLigand.keys():
+		
 		for l in chainAndLigand[cname]:
 			translate_selection(complexXYZ, chainXYZ, l, transFac, f, l)
-	## only chain has to be translated
-	else:
-		translate_selection(complexXYZ, chainXYZ, cname + "_", transFac,f, 
-								cname + "_")
+	# ## only chain has to be translated
+	# else:
+		# translate_selection(complexXYZ, chainXYZ, cname + "_", transFac,f, 
+								# cname + "_")
 
 def canonical_translation(ch, i, transVec, chainAndLigand, label_objects):
 	'''DESCRIPTION:
@@ -811,8 +818,10 @@ def canonical_explosion(selected, label_objects, cNames, chainAndLigand, transVe
 			
 			while isColliding(ligand, ligandAndChain[ligand]):
 				cmd.translate([x * 1/4  for x in transVec], object=ligand)
-				cmd.translate([x * 1/4 for x in transVec], object="label" + ligand)
-				cmd.translate([x * 1/4 for x in transVec], object='_'+ligand+'_label')
+				cmd.translate([x * 1/4 for x in transVec], 
+													object="label" + ligand)
+				cmd.translate([x * 1/4 for x in transVec], 
+													object='_'+ligand+'_label')
 			store_view(group = True, all = True)
 		
 		f = f + 30
@@ -821,14 +830,17 @@ def canonical_explosion(selected, label_objects, cNames, chainAndLigand, transVe
 
 	return f
 	
-def explosion(selected = ' ', typeOfExplosion = 'com', complex = None, removeSolvents = True, exclude = None, cutoff = 10, colorBinding = 'individual'):
+def explosion(selected = ' ', typeOfExplosion = 'com', complex = None, 
+				removeSolvents = True, exclude = None, cutoff = 10, 
+				colorBinding = 'individual'):
 	'''DESCRIPTION:
 		perform an explosion of selected object(s) given in a list and create	
 		a movie. If two objects are given they will be separateted and then 
 		exploded individually.
 	'''
 	selected = selected.split()
-	exclude = exclude.split()
+	if exclude:
+		exclude = exclude.split()
 	if not typeOfExplosion in ['com', 'canonical']:
 		sys.exit("Specify explosion: com (default) or canonical.") 
 		
@@ -864,7 +876,7 @@ def explosion(selected = ' ', typeOfExplosion = 'com', complex = None, removeSol
 		if len(selected) > 1:
 			initialize_movie(frames = str(100*len(selected)))
 		else:
-			initialize_movie(frames = str(150))
+			initialize_movie(frames = str(130))
 		
 		## get ligands
 		storedLigands = get_ligands()
