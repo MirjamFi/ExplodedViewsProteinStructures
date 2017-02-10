@@ -49,7 +49,9 @@ def initialize_movie(selected = None, frames = "100"):
 	if selected:
 		cmd.orient(selected)
 
-def remove_solvents(exclude, cutoff, storedLigands = None):
+def remove_solvents(exclude = "", cutoff =10, storedLigands = None):
+	
+	cutoff = int(cutoff)
 	
 	if not os.path.exists('./cc-counts.tdd'):
 		import urllib
@@ -482,16 +484,20 @@ def color_binding(chainname, ligandname, contactColors = None):
 	''' DESCRIPTION:
 		color binding site in red'''
 	binding = 'byres (' + chainname + ' nto. 3.6 of ' + ligandname +')'
-	cmd.select('_inter', binding)
+	cmd.select('_inter1', binding)
+	
+	binding2 = 'byres (' + ligandname + ' nto. 3.6 of ' + chainname +')'
+	cmd.select('_inter2', binding2)
 	
 	if not contactColors:
-		cmd.color('red', '_inter')
+		cmd.color('red', '_inter1')
 		
 	if contactColors:
 		col = get_colors.get_random_color()
 		while col in contactColors or col in ('white', 'black', 'marine'):
 			col = get_colors.get_random_color()
-		cmd.color(col, '_inter') 
+		cmd.color(col, '_inter1') 
+		cmd.color(col, '_inter2')
 		contactColors.append(col)	
 	cmd.delete('_inter')
 
@@ -619,26 +625,21 @@ def com_translation(cname, chainAndLigand, complexXYZ, chainXYZ, transFac, f):
 		
 		for l in chainAndLigand[cname]:
 			translate_selection(complexXYZ, chainXYZ, l, transFac, f, l)
-	# ## only chain has to be translated
-	# else:
-		# translate_selection(complexXYZ, chainXYZ, cname + "_", transFac,f, 
-								# cname + "_")
 
 def canonical_translation(ch, i, transVec, chainAndLigand, label_objects):
 	'''DESCRIPTION:
 		translate chain ch canonical
 	'''
+	cmd.translate([x * i for x in transVec], object=ch + "_", camera=0)
+	cmd.mview('interpolate', object = ch+"_")
+	cmd.mview('store', object = ch+"_")
+	
 	## if chain contains ligand, translate ligand also
 	if ch in chainAndLigand.keys():
 		for l in chainAndLigand[ch]:
 			cmd.translate([x * i for x in transVec], object=l, camera=0)
 			cmd.mview('interpolate', object=l)
 			cmd.mview('store', object = l)	
-	## only chain has to be translated
-	else:
-		cmd.translate([x * i for x in transVec], object=ch + "_", camera=0)
-		cmd.mview('interpolate', object = ch+"_")
-		cmd.mview('store', object = ch+"_")
 		
 def store_view(obj = None, group = False, all = True):
 	''' DESCRIPTION:
@@ -753,7 +754,7 @@ def com_explosion(selected, label_objects, cNames, chainAndLigand,
 							or isColliding(ligand, ligandAndChain[ligand])
 			else:
 				condition = isColliding(ligand, ligandAndChain[ligand])
-			if condition:
+			while condition:
 				transFac = transFac
 				translate_selection(cXYZ, ligandXYZ, ligand, transFac, f, 
 									chainAndLigand[ligandAndChain[ligand]])
@@ -815,13 +816,22 @@ def canonical_explosion(selected, label_objects, cNames, chainAndLigand, transVe
 		f = f + 15
 		cmd.frame(f)
 		for ligand in ligandAndChain.keys():
-			
-			while isColliding(ligand, ligandAndChain[ligand]):
+			if complex:
+				condition = isColliding(ligand, complex) \
+							or isColliding(ligand, ligandAndChain[ligand])
+			else:
+				condition = isColliding(ligand, ligandAndChain[ligand])
+			while condition:
 				cmd.translate([x * 1/4  for x in transVec], object=ligand)
 				cmd.translate([x * 1/4 for x in transVec], 
 													object="label" + ligand)
 				cmd.translate([x * 1/4 for x in transVec], 
 													object='_'+ligand+'_label')
+				if complex:
+					condition = isColliding(ligand, complex) \
+							or isColliding(ligand, ligandAndChain[ligand])
+				else:
+					condition = isColliding(ligand, ligandAndChain[ligand])
 			store_view(group = True, all = True)
 		
 		f = f + 30
@@ -881,8 +891,8 @@ def explosion(selected = ' ', typeOfExplosion = 'com', complex = None,
 		## get ligands
 		storedLigands = get_ligands()
 		
-		## remove solvent
-		if removeSolvents:
+		## remove solvents
+		if removeSolvents == True:
 			if storedLigands:
 				remove_solvents(exclude, cutoff, storedLigands)
 			else:
@@ -994,8 +1004,6 @@ def explosion(selected = ' ', typeOfExplosion = 'com', complex = None,
 		cmd.frame(f)
 		view_objects = best_view_objects()
 		best_view(view_objects, 'chain', '10')
-		# cmd.orient('all')
-		# cmd.zoom('all', complete=1)
 		cmd.mview('store', object='all')	
 		
 		## store chain objects for movie 
@@ -1147,53 +1155,73 @@ def explosion(selected = ' ', typeOfExplosion = 'com', complex = None,
 	cmd.mview('store', scene='on2')
 		
 	print 'Explosion of', selected, time.clock() - start_time, 'seconds'
-			
-def relabel(selected, newLabel="new label"):
+	
+'''TODO: video muss zweimal gespeichert werden (bei erstem mal noch wackeln in 
+			letztem gespeicherten frame) '''	
+def relabel(selected, newLabels):
 	'''DESCRIPTION:
 		rename an selected object and its label by a new label
 	'''
 	obj = cmd.get_names("objects")
 	x = ''
 	
+	selectedObjects = selected.split()
+	labels = newLabels.split()
 	## relabel label
-	cmd.label("label" + selected , "'%s'" %newLabel )
-	
-	## rename all objects of selection
-	for o in obj:
-		if selected in o:
-			x = o
-			x = x.replace(selected, newLabel)
-			cmd.set_name(o, x)
-
+	print selectedObjects
+	print labels
+	for i in range(0, len(selectedObjects)):
+		print selectedObjects[i], labels[i]
+		cmd.label("label" + selectedObjects[i], "'%s'" %labels[i])
+		## rename all objects
+		for o in obj:
+			if selectedObjects[i] in o:
+				x = o
+				x = x.replace(selectedObjects[i], labels[i])
+				cmd.set_name(o, x)
+				cmd.scene('on','update')
+				cmd.scene('off','update')
+				cmd.scene('on2','update')	
+			
 '''TODO: video muss zweimal gespeichert werden (bei erstem mal noch wackeln in 
 			letztem gespeicherten frame) '''
 def reorient_explosion(frame=1):
 	'''DESCRIPTION:
 		if called, the orientation of the movie is set to the orientation of 
 		given frame from frame till end. '''
+	cmd.zoom('all', complete = 1)
 	x = cmd.get_view(quiet=1)
 	frames = cmd.count_frames()
 	for f in range(int(frame),frames+1):
 		cmd.frame(f)
 		cmd.set_view(x)
-		cmd.zoom('all')
+		cmd.zoom('all', complete = 1)
 		cmd.mview('store')
-''' TODO: nach neuer Repräsentation werden labels immer angezeigt '''	
+
+		
+''' TODO: 	video muss zweimal gespeichert werden (bei erstem mal noch wackeln in 
+			letztem gespeicherten frame) '''
 def renew_representation(selection, representation):
 	'''DESCRIPTION:
-		show selection in given representation
+		show selection in given representation for complete movie
 	'''
-	cmd.show_as(representation, selection)
-	cmd.scene(selection+'_'+representation, 'store')
-	for f in range(1, cmd.count_frames()):
+	selection = selection.split()
+	for f in range(0, cmd.count_frames()):
 		cmd.frame(f)
-		cmd.mview('store', scene=selection+'_'+representation)
-		cmd.mview('reinterpolate')
+		for s in selection:
+			cmd.show_as(representation, s)
+			labels_on()
+			cmd.scene('on', 'update')
+			cmd.scene('on2', 'update')
+		
+	hide_labels()
+	cmd.scene('off', 'update')
+	
 		
 def hide_labels():
 	cmd.hide('labels')
 	cmd.hide('dashes')
-
+	
 def labels_on():
 	cmd.show('dashes')
 	for obj in cmd.get_names('objects'):
@@ -1201,6 +1229,9 @@ def labels_on():
 			cmd.show('labels', obj)
 		
 def remove_solvent(name):
+	''' DESCRIPTION:
+		Remove specific solvent AFTER explosion
+	'''
 	for obj in cmd.get_names('objects'):
 		if name in obj and obj[-1] != '_':
 			cmd.delete(obj)
@@ -1211,4 +1242,5 @@ cmd.extend('reorient_explosion', reorient_explosion)
 cmd.extend('renew_representation', renew_representation)
 cmd.extend('show_labels', labels_on)
 cmd.extend('hide_labels', hide_labels)
+cmd.extend('remove_solvents', remove_solvents)
 cmd.extend('remove_solvent', remove_solvent)
