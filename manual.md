@@ -28,8 +28,8 @@ explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cut
 - exclude: 3-letter code of ligand which shall not be removed (if occurance is known to be bigger than cutoff)
 - cutoff: default: 10, occurance in PDB in total
 - colorBinding:
- - individual (default): each chain has an individual color, binding sites are colored by the colors of according chains
- - gray: all chains are colored gray, each binding site is colored individually
+ - individual: each chain has an individual color, binding sites are colored by the colors of according chains
+ - gray (default): all chains are colored gray, each binding site is colored individually
  - none: no color is changed
 
 ###EXAMPLES:
@@ -41,20 +41,20 @@ explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cut
 	reinitialize
 	# load molecule in PyMOL:
 	fetch 3oaa, type='pdb1'
-	# either explode complete molecule with default values:
-	explosion 3oaa
+	# either explode complete molecule:
+	explosion 3oaa, colorBinding = individual
 	```
 ![](images/3oaa_individual_start.png)
 
 ![](images/3oaa_individual_end.png)
 
 ```python
-	# or parts of it, e.g. with colorBinding=gray:
+	# or parts of it:
 	reinitialize
 	fetch 3oaa, type='pdb1'
 	extract AA, chain A chain B chain C chain D chain E chain F
 	extract BB, chain G chain H
-	explosion AA BB, colorBinding = gray
+	explosion AA BB
 ```
 ![](images/3oaa_parts_start.png)
 
@@ -86,7 +86,7 @@ explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cut
 	extract mol3, chain Q chain R chain  S chain T chain  U chain V chain W chain  X
 	extract mol4, chain Y chain Z chain  a chain b chain  c chain d chain e chain  f
 
-	explosion mol1 mol2 mol3 mol4
+	explosion mol1 mol2 mol3 mol4, colorBinding = individual
 ```
 ![](images/3oaa_multi_start.png)
 
@@ -104,7 +104,7 @@ explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cut
 	# create object for every state
 	split_states 5k7l
     remove 5k7l
-    explosion 5k7l_0001 5k7l_0002 5k7l_0003 5k7l_0004, colorBinding = gray
+    explosion 5k7l_0001 5k7l_0002 5k7l_0003 5k7l_0004
 ```
 ![](images/5k7l_start.png)
 
@@ -119,7 +119,7 @@ explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cut
 	# create object for part or molecule
 	create chainA, chain A
 
-	explosion chainA, complex = 3oaa, colorBinding = gray
+	explosion chainA, complex = 3oaa
 ```
 ![](images/chain_start.png)
 
@@ -129,7 +129,7 @@ explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cut
   # exclude known detergents from removing
   reinitialize
   fetch 5k7l
-  explosion 5k7l, exclude = Y01 NAG
+  explosion 5k7l, exclude = Y01 NAG, colorBinding = individual
 ```
 ![](images/5k7l_det_start.png)
 
