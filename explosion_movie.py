@@ -128,7 +128,7 @@ def calcTransFac(sele):
 	protDim_min, protDim_max = cmd.get_extent(sele)
 	transFac = math.sqrt((protDim_max[0] - protDim_min[0]) ** 2 +
 					 (protDim_max[1] - protDim_min[1]) ** 2 +
-					 (protDim_max[2] - protDim_min[2]) ** 2)/2
+					 (protDim_max[2] - protDim_min[2]) ** 2)/4
 	return transFac
 
 def transAxes(selected):
@@ -316,6 +316,7 @@ def calc_label_positions_circular(ch,chainCOM, complexXYZ, dim):
 		of according chain/ligand
 	'''
 	
+	## sphere
 	min = dim[0]
 	max = dim[1]
 	R = math.sqrt((min[0]-max[0])**2 + (min[1]-max[1])**2 + (min[2]-max[2])**2) #euclidean
@@ -336,6 +337,7 @@ def calc_label_positions_circular(ch,chainCOM, complexXYZ, dim):
 	cy = P2[1]
 	cz = P2[2]
 	
+	## intersection point sphere - com-vector
 	a = dx*dx + dy*dy + dz*dz
 	b = 2*dx*(x0-cx)+2*dy*(y0-cy)+2*dz*(z0-cz)
 	c = cx*cx+cy*cy+cz*cz+x0*x0+y0*y0+z0*z0+-2*(cx*x0+cy*y0+cz*z0)-R*R
@@ -399,25 +401,25 @@ def calc_label_position_flush(chains, transVec, f, chainAndLabel=None):
 			x_pos = chainsComs[ch][0]
 			y_pos = chainsComs[ch][1]
 			if chainsComs[ch][2] > mean_zpos:
-				z_pos = chainsComs[ch][2] + labellength*1
+				z_pos = chainsComs[ch][2] + labellength
 			else:
-				z_pos = chainsComs[ch][2] - labellength*1
+				z_pos = chainsComs[ch][2] - labellength
 			
 		elif transVec[1] > 0 and transVec[2] > 0:
 			y_pos = chainsComs[ch][1]
 			z_pos = chainsComs[ch][2]
 			if chainsComs[ch][0] > mean_xpos:
-				x_pos = chainsComs[ch][0] + labellength*1
+				x_pos = chainsComs[ch][0] + labellength
 			else:
-				x_pos = chainsComs[ch][0] - labellength*1
+				x_pos = chainsComs[ch][0] - labellength
 				
 		elif transVec[2] > 0 and transVec[0] > 0:
 			x_pos = chainsComs[ch][0]
 			z_pos = chainsComs[ch][2]
 			if chainsComs[ch][1] > mean_ypos:
-				y_pos = chainsComs[ch][1] + labellength*1
+				y_pos = chainsComs[ch][1] + labellength
 			else:
-				y_pos = chainsComs[ch][1] - labellength*1
+				y_pos = chainsComs[ch][1] - labellength
 				
 		cmd.pseudoatom('_'+ch+'_pos', pos = [x_pos, y_pos, z_pos])
 		cmd.distance('_'+ch + '_label','_'+ch+'_pos', '_com_' + ch)
@@ -694,7 +696,7 @@ def com_explosion(selected, label_objects, cNames, chainAndLigand,
 		complexXYZ = com
 	if not com:
 		complexXYZ = calc_COM(selected)
-	
+	f = f + 10
 	''' translate chains '''
 	for chainname in cNames:
 		## COM of chain
@@ -711,6 +713,7 @@ def com_explosion(selected, label_objects, cNames, chainAndLigand,
 							cXYZ = chainsCOMS[cname]
 							com_translation(cname, chainAndLigand, complexXYZ,
 												cXYZ, transFac, f)
+						
 			store_view(group = True, all = True)
 									
 		## if only one chain is selected, translate it and its ligand
@@ -724,6 +727,7 @@ def com_explosion(selected, label_objects, cNames, chainAndLigand,
 				while isColliding(chainname, complex):
 					com_translation(chainname, chainAndLigand, complexXYZ,
 												chainXYZ, transFac, f)
+					f = f + 10
 			else:
 				if chainname in chainAndLigand.keys():
 						cmd.translate([transFac, transFac, transFac], 
@@ -735,7 +739,7 @@ def com_explosion(selected, label_objects, cNames, chainAndLigand,
 			store_view(chainname + '_')
 
 	## store objects for movie
-	f = f + 30
+	f = f + 20
 	cmd.frame(f)
 	if len(cNames) == 1:
 		cmd.zoom('all', complete=1)
@@ -743,7 +747,7 @@ def com_explosion(selected, label_objects, cNames, chainAndLigand,
 
 	''' translate ligands '''
 	if ligandAndChain:
-		f = f + 10
+		f = f + 15
 		cmd.frame(f)
 		for ligand in ligandAndChain.keys():
 			cXYZ = chainsCOMS[ligandAndChain[ligand]]
@@ -755,15 +759,14 @@ def com_explosion(selected, label_objects, cNames, chainAndLigand,
 			else:
 				condition = isColliding(ligand, ligandAndChain[ligand])
 			while condition:
-				transFac = transFac
-				translate_selection(cXYZ, ligandXYZ, ligand, transFac, f, 
+				translate_selection(cXYZ, ligandXYZ, ligand, transFac/2, f, 
 									chainAndLigand[ligandAndChain[ligand]])
-				translate_selection(cXYZ, ligandXYZ, "label" + ligand, transFac, 
+				translate_selection(cXYZ, ligandXYZ, "label" + ligand, transFac/2, 
 									f, chainAndLigand[ligandAndChain[ligand]])
 				translate_selection(cXYZ, ligandXYZ, label_objects[ligand], 
-									transFac, f)
+									transFac/2, f)
 				translate_selection(cXYZ, ligandXYZ, label_objects[ligand][0], 
-									transFac, f)
+									transFac/2, f)
 				if complex:
 					condition = isColliding(ligand, complex) \
 							or isColliding(ligand, ligandAndChain[ligand])
@@ -795,12 +798,12 @@ def canonical_explosion(selected, label_objects, cNames, chainAndLigand, transVe
 					canonical_translation(ch, i, transVec, chainAndLigand, \
 											label_objects)
 					i += 1
-		
+	i = 1
 	for chain in cNames:
 		for c in cNames:
 			if c != chain:
 				while isColliding(chain, c):
-					for ch in cNames[1:]:
+					for ch in cNames[0:]:
 						canonical_translation(ch, i, transVec, chainAndLigand,\
 												label_objects)
 						i += 1
@@ -842,7 +845,7 @@ def canonical_explosion(selected, label_objects, cNames, chainAndLigand, transVe
 	
 def explosion(selected = ' ', typeOfExplosion = 'com', complex = None, 
 				removeSolvents = True, exclude = None, cutoff = 10, 
-				colorBinding = 'individual'):
+				colorBinding = 'gray'):
 	'''DESCRIPTION:
 		perform an explosion of selected object(s) given in a list and create	
 		a movie. If two objects are given they will be separateted and then 
@@ -1197,7 +1200,6 @@ def reorient_explosion(frame=1):
 		cmd.set_view(x)
 		cmd.zoom('all', complete = 1)
 		cmd.mview('store')
-
 		
 ''' TODO: 	video muss zweimal gespeichert werden (bei erstem mal noch wackeln in 
 			letztem gespeicherten frame) '''
@@ -1216,8 +1218,7 @@ def renew_representation(selection, representation):
 		
 	hide_labels()
 	cmd.scene('off', 'update')
-	
-		
+			
 def hide_labels():
 	cmd.hide('labels')
 	cmd.hide('dashes')
@@ -1228,7 +1229,7 @@ def labels_on():
 		if obj.startswith('label'):
 			cmd.show('labels', obj)
 		
-def remove_solvent(name):
+def remove_ligand(name):
 	''' DESCRIPTION:
 		Remove specific solvent AFTER explosion
 	'''
@@ -1243,4 +1244,4 @@ cmd.extend('renew_representation', renew_representation)
 cmd.extend('show_labels', labels_on)
 cmd.extend('hide_labels', hide_labels)
 cmd.extend('remove_solvents', remove_solvents)
-cmd.extend('remove_solvent', remove_solvent)
+cmd.extend('remove_solvent', remove_ligand)
