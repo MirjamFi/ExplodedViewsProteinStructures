@@ -50,7 +50,6 @@ def initialize_movie(selected = None, frames = "100"):
 		cmd.orient(selected)
 
 def remove_solvents(exclude = "", cutoff =10, storedLigands = None):
-	
 	cutoff = int(cutoff)
 	
 	if not os.path.exists('./cc-counts.tdd'):
@@ -72,14 +71,14 @@ def remove_solvents(exclude = "", cutoff =10, storedLigands = None):
 			if row[0] != 'id':
 				ligand = row[0]
 				ligcount = int(row[1])
-				if ligcount > cutoff and not ligand in aa and \
-					not ligand in ['ADP', 'ANP']:
+				if ligcount > cutoff and not ligand in aa:
 					if not exclude or ligand not in exclude:
 						cmd.remove('resn ' + ligand)
 						if storedLigands:
 							for lig in storedLigands:
-								if lig.startswith(ligand):
+								if lig.split('-')[0] == ligand:
 									removedLigands.append(lig)
+
 	for removelig in removedLigands:
 		storedLigands.discard(removelig)
 
@@ -212,7 +211,7 @@ def create_objects(chains, selected, storedLigands, chainsCOMS, complexXYZ, dim,
 			chainCOM = chainsCOMS[chainname]
 			
 			## label chains
-			labels = label_obj(chainname, chainCOM, complexXYZ, dim)
+			labels = label_obj(chainname, chainCOM, complexXYZ, dim, chainAndLabel)
 			if len(labels) > 1:
 				chainAndLabel = labels[0]
 				label_objects_new = labels[1]
@@ -306,7 +305,7 @@ def get_ligand_chain_pair(l, i, selection, chainname, chainAndLigand,
 		chainAndLigand[chainname].append(ligandname + "_")
 
 		label_objects.update(label_objects_new)
-		  
+		
 		return label_objects
 	
 	if typeOfExplosion == 'canonical':
@@ -443,7 +442,7 @@ def calc_label_position_flush(chains, transVec, f, chainAndLabel=None):
 		label_objects.update({ch : '_'+ch + '_label'})
 	return [chainAndLabel, label_objects]
 
-def label_obj(chainname, chainCOM, complexXYZ, dim):
+def label_obj(chainname, chainCOM, complexXYZ, dim, chainAndLabel = None):
 	'''DESCRIPTION:
 		create an label for given chain (if chainAndLabel set) or ligand  
 	'''
@@ -454,20 +453,31 @@ def label_obj(chainname, chainCOM, complexXYZ, dim):
 	cmd.pseudoatom("label" + chainname, pos=label_pos)
 	
 	## label object
-	if len(chainname.split('_')) > 2:
-		ligname = '_'.join(chainname.split("_")[-2:])
-		cmd.label("label" + chainname, "'%s'" %ligname)
+	if not chainAndLabel:
+		if len(chainname.split('_')) > 2:
+			ligname = '_'.join(chainname.split("_")[-2:])
+			cmd.label("label" + chainname, "'%s'" %ligname)
+		else:
+			cmd.label("label" + chainname, "'%s'" %chainname.split('_')[-1])
 	else:
-		cmd.label("label" + chainname, "'%s'" %chainname.split('_')[-1])
-		
+		cmd.label("label" + chainname, "'%s'" %chainname)
+	
+	## save label of chain in dictonary
+	if chainAndLabel:
+		chainAndLabel[chainname] = "label" + chainname
+
 	## store ligand label in movie
-	cmd.mview('store', object = "label" + chainname)
+	if not chainAndLabel:
+		cmd.mview('store', object = "label" + chainname)
 		
 	## hide pseudoatom represantation
 	cmd.hide('nonbonded', "label" + chainname)
 	
 	## return dictionary of chain and its label
-	return {chainname : lab_obj}
+	if chainAndLabel:
+		return [chainAndLabel, {chainname : lab_obj}]
+	else:
+		return {chainname : lab_obj}
 
 def noLigands(chainname, chainAndLigand, label_objec = None):
 	''' DESCRIPTION:
