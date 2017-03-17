@@ -65,7 +65,7 @@ def remove_solvents(exclude = "", cutoff =10, storedLigands = None):
 	cmd.remove('solvent')
 	
 	import csv
-	
+	removedLigands = []
 	with open('./cc-counts.tdd') as csvfile:
 		countreader = csv.reader(csvfile, delimiter='\t')
 		for row in countreader:
@@ -76,9 +76,13 @@ def remove_solvents(exclude = "", cutoff =10, storedLigands = None):
 					not ligand in ['ADP', 'ANP']:
 					if not exclude or ligand not in exclude:
 						cmd.remove('resn ' + ligand)
-						if storedLigands and ligand in storedLigands:
-							storedLigands.discard(ligand)
-			
+						if storedLigands:
+							for lig in storedLigands:
+								if lig.startswith(ligand):
+									removedLigands.append(lig)
+	for removelig in removedLigands:
+		storedLigands.discard(removelig)
+
 def get_ligands():
 	''' DESCRIPTION:
 		get all ligands (organic) from complex, return them as a set'''
@@ -98,7 +102,7 @@ def get_ligands():
 		cmd.select('temp', 'first allOrg')
 		
 		## store the residue name
-		cmd.iterate('temp', 'stored.ligands.append(resn)')
+		cmd.iterate('temp', 'stored.ligands.append("%s-%s" %(resn,resi))')
 		
 		## remove by molecule
 		cmd.select('allOrg', 'allOrg and not (bm. temp)')
@@ -182,7 +186,7 @@ def create_objects(chains, selected, storedLigands, chainsCOMS, complexXYZ, dim,
 	objColor = {}
 	
 	for c in chains:	
-		if colorBinding == 'individual':
+		if colorBinding == 'chain':
 			## color each chain individually (red is color for binding site)
 			col = get_colors.get_random_color()
 			while col in objColor.values() or \
@@ -190,7 +194,7 @@ def create_objects(chains, selected, storedLigands, chainsCOMS, complexXYZ, dim,
 				col = get_colors.get_random_color()
 			cmd.color(col, selected + '& chain ' + c) 
 			
-		if colorBinding == 'gray':
+		if colorBinding == 'contact':
 			## color all chains in gray
 			cmd.color('gray', selected + '& chain ' + c)
 					
@@ -198,12 +202,8 @@ def create_objects(chains, selected, storedLigands, chainsCOMS, complexXYZ, dim,
 		chainname = selected + '_chain' + c
 		cNames.append(chainname)
 		cmd.extract(chainname, selected + ' & chain '+c)
-		if colorBinding == 'individual':
+		if colorBinding == 'chain':
 			objColor.update({chainname:col})
-		# if not storedLigands:
-			# cmd.show('cartoon',chainname)
-		# else:
-			# cmd.show('surface', chainname)
 
 		if typeOfExplosion=='com':
 			
@@ -212,7 +212,7 @@ def create_objects(chains, selected, storedLigands, chainsCOMS, complexXYZ, dim,
 			chainCOM = chainsCOMS[chainname]
 			
 			## label chains
-			labels = label_obj(chainname, chainCOM, complexXYZ, dim, chainAndLabel)
+			labels = label_obj(chainname, chainCOM, complexXYZ, dim)
 			if len(labels) > 1:
 				chainAndLabel = labels[0]
 				label_objects_new = labels[1]
@@ -233,26 +233,32 @@ def create_objects(chains, selected, storedLigands, chainsCOMS, complexXYZ, dim,
 		
 		## create objects for ligands
 		if storedLigands:
+			i = 1
 			for l in storedLigands:
+				resname, resid = l.split('-')
 			
 				## select ligand on chain	
-				selection = chainname + ' & resn ' + l
-				
-				if typeOfExplosion == 'com':
-					label_objec_new = get_ligand_chain_pair(l, selection, 
-												chainname, chainAndLigand, 
-												ligandAndChain, complexXYZ, dim, 
-												label_objec, 'com',ligandsCOMS)
-					if label_objects_new:
-						label_objec.update(label_objects_new)
-				else:
-					get_ligand_chain_pair(l, selection, chainname, 
-										chainAndLigand, ligandAndChain, 
-										complexXYZ, dim, label_objec, 
-										typeOfExplosion = 'canonical')
-					
+				selection = chainname + ' & resn ' + resname + "& resi " + resid
+
+				if cmd.count_atoms(selection) > 0:
+					if typeOfExplosion == 'com':
+						label_objec_new = get_ligand_chain_pair(l,i, selection, 
+													chainname, chainAndLigand, 
+													ligandAndChain, complexXYZ, dim, 
+													label_objec, 'com',ligandsCOMS)
+						if label_objects_new:
+							label_objec.update(label_objects_new)
+					else:
+						get_ligand_chain_pair(l, i,selection, chainname, 
+											chainAndLigand, ligandAndChain, 
+											complexXYZ, dim, label_objec, 
+											typeOfExplosion = 'canonical')
+						
 					cmd.frame(f)
 					cmd.mview('store', object = 'all')
+					i += 1
+				else:
+					continue
 			## if there is no ligand on chain, just keep chain and its label
 			if typeOfExplosion == 'com':
 				noLigands(chainname, chainAndLigand, label_objec)
@@ -270,45 +276,45 @@ def create_objects(chains, selected, storedLigands, chainsCOMS, complexXYZ, dim,
 	else:
 		return cNames, chainAndLabel, chainAndLigand, ligandAndChain, f, label_objec, objColor
 
-def get_ligand_chain_pair(l, selection, chainname, chainAndLigand, 
+def get_ligand_chain_pair(l, i, selection, chainname, chainAndLigand, 
 							ligandAndChain, complexXYZ, dim, label_objects, 
 							typeOfExplosion = 'com', ligandsCOMS = None):
 	'''DESCRIPTION:
 		get pair of ligand and respective chain''' 
 
 	## create object for ligand
-	if cmd.count_atoms(selection) > 0:
-		ligandname = chainname + '_' + l
-		cmd.extract(ligandname, selection)
-		# cmd.show('spheres', ligandname)
 	
-		ligandAndChain[ligandname] = chainname
-		
-		if typeOfExplosion == 'com':
-			## calculate COM of ligand
-			ligandsCOMS[ligandname] = calc_COM(ligandname)
-			ligandCOM = ligandsCOMS[ligandname]
-			## label ligands			
-			label_objects_new = label_obj(ligandname, ligandCOM, complexXYZ, dim)
-		
-			## group chains and respective ligands to translate  
-			## them together at first (including their labels)
-			cmd.group(chainname + "_" + l + "_", 
-							chainname + " " + ligandname + " " + "label" + \
-							chainname + " " + "label" + ligandname + " " + \
-							label_objects_new[ligandname][0] + " " + \
-							label_objects[chainname][0])
-			chainAndLigand[chainname].append(chainname + "_" + l + "_")
+	ligandname = chainname + '_' + l.split('-')[0] +'_'+ str(i)
+	cmd.extract(ligandname, selection)
 
-			label_objects.update(label_objects_new)
-			  
-			return label_objects
-		
-		if typeOfExplosion == 'canonical':
-			## group chains and respective ligands to translate  
-			## them together at first (including their labels)
-			cmd.group(chainname + "_" + l + "_", chainname + " " + ligandname)
-			chainAndLigand[chainname].append(chainname + "_" + l + "_")			
+	ligandAndChain[ligandname] = chainname
+	
+	if typeOfExplosion == 'com':
+		## calculate COM of ligand
+		ligandsCOMS[ligandname] = calc_COM(ligandname)
+		ligandCOM = ligandsCOMS[ligandname]
+		## label ligands			
+		label_objects_new = label_obj(ligandname, ligandCOM, complexXYZ, dim)
+	
+		## group chains and respective ligands to translate  
+		## them together at first (including their labels)
+		cmd.group(ligandname + "_", 
+						chainname + " " + ligandname + " " + "label" + \
+						chainname + " " + "label" + ligandname + " " + \
+						label_objects_new[ligandname][0] + " " + \
+						label_objects[chainname][0])
+		chainAndLigand[chainname].append(ligandname + "_")
+
+		label_objects.update(label_objects_new)
+		  
+		return label_objects
+	
+	if typeOfExplosion == 'canonical':
+		## group chains and respective ligands to translate  
+		## them together at first (including their labels)
+		cmd.group(ligandname + "_", chainname + " " + ligandname)
+		chainAndLigand[chainname].append(chainname + "_" + l.split('-')[0] +\
+												'_'+ str(i) + "_")			
 		
 def calc_label_positions_circular(ch,chainCOM, complexXYZ, dim):
 	''' DESCRIPTION:
@@ -426,7 +432,10 @@ def calc_label_position_flush(chains, transVec, f, chainAndLabel=None):
 		cmd.hide('nonbonded', '_'+ch+'_pos')	
 		cmd.frame(f)
 		cmd.pseudoatom('label' + ch, pos = [x_pos, y_pos, z_pos])
-		cmd.label("label" + ch, "'%s'" %ch.split('_')[-1])
+		if len(ch.split('_')) > 2:
+			cmd.label("label" + ch, "'%s'" %'_'.join(ch.split('_')[-2:]))
+		else:
+			cmd.label("label" + ch, "'%s'" %ch.split('_')[-1])
 		cmd.hide('labels', '_'+ch + '_label')
 		cmd.hide('nonbonded', 'label' + ch)
 		
@@ -434,7 +443,7 @@ def calc_label_position_flush(chains, transVec, f, chainAndLabel=None):
 		label_objects.update({ch : '_'+ch + '_label'})
 	return [chainAndLabel, label_objects]
 
-def label_obj(chainname, chainCOM, complexXYZ, dim, chainAndLabel = None):
+def label_obj(chainname, chainCOM, complexXYZ, dim):
 	'''DESCRIPTION:
 		create an label for given chain (if chainAndLabel set) or ligand  
 	'''
@@ -444,31 +453,21 @@ def label_obj(chainname, chainCOM, complexXYZ, dim, chainAndLabel = None):
 	
 	cmd.pseudoatom("label" + chainname, pos=label_pos)
 	
-	## label ligand
-	if not chainAndLabel:
-		ligName = chainname.split("_")[-1]
-		cmd.label("label" + chainname, "'%s'" %ligName)
-		
-	## label chain
+	## label object
+	if len(chainname.split('_')) > 2:
+		ligname = '_'.join(chainname.split("_")[-2:])
+		cmd.label("label" + chainname, "'%s'" %ligname)
 	else:
-		cmd.label("label" + chainname, "'%s'" %chainname)
-		
-	## save label of chain in dictonary
-	if chainAndLabel:
-		chainAndLabel[chainname] = "label" + chainname
+		cmd.label("label" + chainname, "'%s'" %chainname.split('_')[-1])
 		
 	## store ligand label in movie
-	if not chainAndLabel:
-		cmd.mview('store', object = "label" + chainname)
+	cmd.mview('store', object = "label" + chainname)
 		
 	## hide pseudoatom represantation
 	cmd.hide('nonbonded', "label" + chainname)
 	
 	## return dictionary of chain and its label
-	if chainAndLabel:
-		return [chainAndLabel, {chainname : lab_obj}]
-	else:
-		return {chainname : lab_obj}
+	return {chainname : lab_obj}
 
 def noLigands(chainname, chainAndLigand, label_objec = None):
 	''' DESCRIPTION:
@@ -507,7 +506,7 @@ def color_contact(cNames, objColor, colorBinding):
 	''' DESCRIPTION:
 		color contact site between two chains by color of the other chain
 	'''
-	if colorBinding == 'gray':
+	if colorBinding == 'contact':
 		contactColors = ['gray']
 	i = 1
 	for chain in cNames:
@@ -520,11 +519,11 @@ def color_contact(cNames, objColor, colorBinding):
 				binding = 'byres (' + ch + ' nto. 5 of ' + chain +')'
 				cmd.select('_contact2', binding)
 				
-				if colorBinding == 'individual':
+				if colorBinding == 'chain':
 					cmd.color(objColor[ch], '_contact1')
 					cmd.color(objColor[chain], '_contact2')
 					
-				if colorBinding == 'gray':
+				if colorBinding == 'contact':
 					col = get_colors.get_random_color()
 					while col in contactColors or \
 									col in ('white', 'black', 'marine'):
@@ -533,7 +532,7 @@ def color_contact(cNames, objColor, colorBinding):
 					cmd.color(col, '_contact2') 
 					contactColors.append(col)			
 		i+=1
-	if colorBinding == 'gray':
+	if colorBinding == 'contact':
 		return contactColors
 
 def create_complex(chains, obj):
@@ -727,7 +726,6 @@ def com_explosion(selected, label_objects, cNames, chainAndLigand,
 				while isColliding(chainname, complex):
 					com_translation(chainname, chainAndLigand, complexXYZ,
 												chainXYZ, transFac, f)
-					f = f + 10
 			else:
 				if chainname in chainAndLigand.keys():
 						cmd.translate([transFac, transFac, transFac], 
@@ -845,7 +843,7 @@ def canonical_explosion(selected, label_objects, cNames, chainAndLigand, transVe
 	
 def explosion(selected = ' ', typeOfExplosion = 'com', complex = None, 
 				removeSolvents = True, exclude = None, cutoff = 10, 
-				colorBinding = 'gray'):
+				colorBinding = 'contact', showlabels = False):
 	'''DESCRIPTION:
 		perform an explosion of selected object(s) given in a list and create	
 		a movie. If two objects are given they will be separateted and then 
@@ -865,7 +863,7 @@ def explosion(selected = ' ', typeOfExplosion = 'com', complex = None,
 			complex = None
 			print 'No need of complex'
 	
-	if not colorBinding in ['individual', 'gray', 'none']:
+	if not colorBinding in ['chain', 'contact', 'none']:
 		sys.exit("Specify a color for chains: none (do not color), gray, or individual.")
 			
 	'''setup of selected sturcture'''
@@ -878,9 +876,6 @@ def explosion(selected = ' ', typeOfExplosion = 'com', complex = None,
 	cmd.set('dash_round_ends', 'off')
 	cmd.set('dash_width', 1)
 	cmd.set('dash_gap', 0)
-	
-	# if complex:
-		# cmd.show('surface', complex)
 		
 	'''preparation and translation'''
 	if len(selected) >= 1:
@@ -987,22 +982,21 @@ def explosion(selected = ' ', typeOfExplosion = 'com', complex = None,
 				label_objects.update(label_objects_new)
 			if objColor_new:
 				objColor.update(objColor_new)
-				
+		
 		## color contact sites between chains
-		if colorBinding == 'gray':
+		if colorBinding == 'contact':
 			contactColors = color_contact(cNames, objColor, colorBinding)	
-		elif colorBinding == 'individual':
+		elif colorBinding == 'chain':
 			color_contact(cNames, objColor, colorBinding)	
-			
+		
 		## color binding site
 		if colorBinding != 'none':
 			for cl in chainAndLigand.iteritems():
 				for l in cl[1]:
-					if colorBinding == 'gray' and contactColors:
+					if colorBinding == 'contact' and contactColors:
 						color_binding(cl[0], l[:-1], contactColors)
-					elif colorBinding == 'individual':
-						color_binding(cl[0], l[:-1])
-					
+					elif colorBinding == 'chain':
+						color_binding(cl[0], l[:-1])		
 		## set best view
 		cmd.frame(f)
 		view_objects = best_view_objects()
@@ -1027,36 +1021,39 @@ def explosion(selected = ' ', typeOfExplosion = 'com', complex = None,
 						label_objects[l[:-1]] + " " + "label" + ch + " " + \
 						"label" + l[:-1] + " " + '_'+ch + '_label' + " " +\
 						'_'+l[:-1] + '_label', 'add') 
-				else:
-					cmd.group(ch + '_', "label"+ch + " "+'_'+ch + '_label','add')
+				cmd.group(ch + '_', "label"+ch + " "+'_'+ch + '_label','add')
 			cmd.frame(1)
 			cmd.zoom('all', complete=1)
 			cmd.mview('store', object='all')
-			cmd.scene('on', 'store')
-			cmd.mview('store', scene='on')
+			if not showlabels:
+				cmd.scene('on', 'store')
+				cmd.mview('store', scene='on')
 
 		## show labels
 		if typeOfExplosion == 'com':
 			cmd.frame(f-20)
-			show_labels(label_objects)
-			cmd.scene('on', 'store')
-			cmd.mview('store', scene='on')
-			cmd.mview('store', object='all')
+			if not showlabels:
+				show_labels(label_objects)
+				cmd.scene('on', 'store')
+				cmd.mview('store', scene='on')
+				cmd.mview('store', object='all')
 		
 		f = f + 20
 		cmd.frame(f)	
 		cmd.zoom('all', complete=1)
 		cmd.mview('store', object='all')
-		cmd.mview('store', scene='on')
+		if not showlabels:
+			cmd.mview('store', scene='on')
 		
 		## hide labels
 		f = f + 1
-		cmd.frame(f)
-		cmd.hide('labels')
-		cmd.hide('dashes')
-		cmd.scene('off', 'store')
-		cmd.zoom('all',complete=1)
-		cmd.mview('store', scene='off')
+		if not showlabels:
+			cmd.frame(f)
+			cmd.hide('labels')
+			cmd.hide('dashes')
+			cmd.scene('off', 'store')
+			cmd.zoom('all',complete=1)
+			cmd.mview('store', scene='off')
 			
 		f = f + 10		
 		if len(selected) > 1:
@@ -1148,14 +1145,16 @@ def explosion(selected = ' ', typeOfExplosion = 'com', complex = None,
 			cmd.delete('_'+obj)
 
 	cmd.frame(f-29)
-	show_labels(label_objects)
-	cmd.scene('on2', 'store')
-	cmd.mview('store', scene='on2')
+	if not showlabels:
+		show_labels(label_objects)
+		cmd.scene('on2', 'store')
+		cmd.mview('store', scene='on2')
 	cmd.frame(f)
 	view_objects =best_view_objects(True)
 	best_view(view_objects, 'chain', '10')
 	cmd.zoom('all', complete=1)
-	cmd.mview('store', scene='on2')
+	if not showlabels:
+		cmd.mview('store', scene='on2')
 		
 	print 'Explosion of', selected, time.clock() - start_time, 'seconds'
 	
@@ -1171,10 +1170,7 @@ def relabel(selected, newLabels):
 	selectedObjects = selected.split()
 	labels = newLabels.split()
 	## relabel label
-	print selectedObjects
-	print labels
 	for i in range(0, len(selectedObjects)):
-		print selectedObjects[i], labels[i]
 		cmd.label("label" + selectedObjects[i], "'%s'" %labels[i])
 		## rename all objects
 		for o in obj:
@@ -1243,5 +1239,4 @@ cmd.extend('reorient_explosion', reorient_explosion)
 cmd.extend('renew_representation', renew_representation)
 cmd.extend('show_labels', labels_on)
 cmd.extend('hide_labels', hide_labels)
-cmd.extend('remove_solvents', remove_solvents)
-cmd.extend('remove_solvent', remove_ligand)
+cmd.extend('remove_ligand', remove_ligand)
