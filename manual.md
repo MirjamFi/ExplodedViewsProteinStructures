@@ -18,19 +18,20 @@ in the modules of PyMOL.
 
 ###USAGE:
 
-explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cutoff [,colorBinding]]]]]]
+explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cutoff [,colorBinding [, showlabels]]]]]]]
 
 ###ARGUMENTS:
 - selected: 	names of objects to explode
 - typeOfExplosion: 	'com'(default) or 'canonical'
 - complex:	Name of object relative to the part of molecule which shall be translated
-- removeSolvents: boolean (default: true), removes all solvents and ligands with occurance bigger than cutoff value
+- removeSolvents: boolean (default: True), removes all solvents and ligands with occurance bigger than cutoff value
 - exclude: 3-letter code of ligand which shall not be removed (if occurance is known to be bigger than cutoff)
 - cutoff: default: 10, occurance in PDB in total
 - colorBinding:
- - individual: each chain has an individual color, binding sites are colored by the colors of according chains
- - gray (default): all chains are colored gray, each binding site is colored individually
+ - chain: each chain has an individual color, binding sites are colored by the colors of according chains
+ - contact (default): all chains are colored gray, each binding site is colored individually
  - none: no color is changed
+- showlabels: default: False, if set True, labels are shown in the whole movie, else only in beginning and end
 
 ###EXAMPLES:
 ```python
@@ -42,7 +43,7 @@ explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cut
 	# load molecule in PyMOL:
 	fetch 3oaa, type='pdb1'
 	# either explode complete molecule:
-	explosion 3oaa, colorBinding = individual
+	explosion 3oaa, colorBinding = chain, exclude = ADP ANP
 	```
 ![](images/3oaa_individual_start.png)
 
@@ -54,7 +55,7 @@ explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cut
 	fetch 3oaa, type='pdb1'
 	extract AA, chain A chain B chain C chain D chain E chain F
 	extract BB, chain G chain H
-	explosion AA BB
+	explosion AA BB, exclude = ADP ANP
 ```
 ![](images/3oaa_parts_start.png)
 
@@ -66,7 +67,7 @@ explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cut
 
 ```python
 	# or explode canonical without and canonical:
-	explosion 3oaa, typeOfExplosion = canonical, colorBinding = none
+	explosion 3oaa, typeOfExplosion = canonical, colorBinding = none, exclude ADP ANP
 ```
 ![](images/3oaa_canonical_start.png)
 
@@ -86,7 +87,7 @@ explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cut
 	extract mol3, chain Q chain R chain  S chain T chain  U chain V chain W chain  X
 	extract mol4, chain Y chain Z chain  a chain b chain  c chain d chain e chain  f
 
-	explosion mol1 mol2 mol3 mol4, colorBinding = individual
+	explosion mol1 mol2 mol3 mol4, colorBinding = chain
 ```
 ![](images/3oaa_multi_start.png)
 
@@ -124,13 +125,3 @@ explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cut
 ![](images/chain_start.png)
 
 ![](images/chain_end.png)
-
-```python
-  # exclude known detergents from removing
-  reinitialize
-  fetch 5k7l
-  explosion 5k7l, exclude = Y01 NAG, colorBinding = individual
-```
-![](images/5k7l_det_start.png)
-
-![](images/5k7l_det_end.png)
