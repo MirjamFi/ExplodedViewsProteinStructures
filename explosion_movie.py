@@ -1154,16 +1154,18 @@ def explosion(selected = ' ', typeOfExplosion = 'com', complex = None,
 				
 			cmd.delete('_'+obj)
 
-	cmd.frame(f-29)
-	if not showlabels:
+	if not showlabels and len(selected) == 1:
+		cmd.frame(f-29)
 		show_labels(label_objects)
 		cmd.scene('on2', 'store')
 		cmd.mview('store', scene='on2')
+	elif len(selected) > 1:
+		f = f - 25
 	cmd.frame(f)
 	view_objects =best_view_objects(True)
 	best_view(view_objects, 'chain', '10')
 	cmd.zoom('all', complete=1)
-	if not showlabels:
+	if not showlabels and len(selected) == 1:
 		cmd.mview('store', scene='on2')
 		
 	print 'Explosion of', selected, time.clock() - start_time, 'seconds'
