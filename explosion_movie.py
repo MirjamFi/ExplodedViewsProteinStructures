@@ -1,6 +1,7 @@
-# run C:/Users/Figaschewski/Dropbox/Masterarbeit/Masterthesis/explosion_movie.py
 
 '''
+DESCRIPTION
+
 explosion creates a movie of the exploded view of a molecule. 
 If there are multiple objects given for explosion, first they get spatially 
 separated and then explode individually one after the other. The order of 
@@ -17,12 +18,22 @@ There are two types of explosion direction:
 If only a part of the object shall be translated the object can be given as 
 complex to make sure the part is not translated into the object.
 
+AUTHOR
+
+	Mirjam Figaschewski
+	mirjam_figaschewski (at) web.de
+
 DEPENDENCIES:
 get_colors.py (https://pymolwiki.org/index.php/Get_colors) and 
 center_of_mass.py (https://pymolwiki.org/index.php/Center_of_mass)
-in the modules of PyMOL.
+viewpoints.py (https://github.com/julianheinrich/viewpoints)
+get_colors.py (https://pymolwiki.org/index.php/Get_colors)
 
+EXAMPLES
+
+explosion 5gmz
 '''
+
 from pymol import cmd 
 import math
 import center_of_mass as cenma ## calulate center of mass
@@ -51,6 +62,10 @@ def initialize_movie(selected = None, frames = "100"):
 
 def remove_solvents(exclude = "", cutoff =10, storedLigands = None):
 	cutoff = int(cutoff)
+	'''DESCRIPTION:
+		removes ligands/solvents with occurence higher than cutoff in cc-counts.tdd
+		ligands in excluded are not removed
+	'''
 	
 	if not os.path.exists('./cc-counts.tdd'):
 		import urllib
@@ -114,7 +129,7 @@ def get_ligands():
 def calc_COM(transname):
 	'''DESCRIPTION:
 		calculate CenterOfMass of an object 
-	'''
+	''' 
 	cenma.com(transname, state = 1)
 	cmd.zoom(transname + '_COM')
 	pos = cmd.get_position(transname + '_COM')
@@ -160,6 +175,10 @@ def transAxes(selected):
 	
 def create_objects(chains, selected, storedLigands, chainsCOMS, complexXYZ, dim, 
 					colorBinding, chainAndLigand = None, typeOfExplosion = 'com'):
+	''' DESCRIPTION:
+		for every chain and ligand a unique object is created, coloring is 
+		applied and labels created
+	'''
 
 	label_objec = {}
 	
@@ -369,9 +388,13 @@ def calc_label_positions_circular(ch,chainCOM, complexXYZ, dim):
 	return [x,y,z], ['_'+ch+'_label']
 		
 def calc_label_position_flush(chains, transVec, f, chainAndLabel=None):
+	''' DESCRIPTION:
+		set labels on left or right (up/down) of object, connection line to com
+		of according chain/ligand
+	'''
 	chainsComs = {}
 	label_objects = {}
-	## Determine the extents of empty space regions,
+
 	## Determine the positions of anchor points,
 	size = {}
 	for ch in chains:
@@ -587,7 +610,7 @@ def isColliding(sel1, sel2):
 
 def best_view_objects(label = False):
 	'''DESCRIPTION: 
-		return sting of all objects condsidered for best_view calulation 
+		return string of all objects condsidered for best_view calulation 
 	'''
 	view_objects = " "
 	for obj in cmd.get_names('objects'):
@@ -654,7 +677,8 @@ def canonical_translation(ch, i, transVec, chainAndLigand, label_objects):
 		
 def store_view(obj = None, group = False, all = True):
 	''' DESCRIPTION:
-		store selected view '''
+		store selected view 
+	'''
 		
 	## store all objects
 	if group:
@@ -874,7 +898,7 @@ def explosion(selected = ' ', typeOfExplosion = 'com', complex = None,
 			print 'No need of complex'
 	
 	if not colorBinding in ['chain', 'contact', 'none']:
-		sys.exit("Specify a color for chains: none (do not color), gray, or individual.")
+		sys.exit("Specify a color for chains: none (do not color), chain, or contact.")
 			
 	'''setup of selected sturcture'''
 	## case sensitive for chain ids
@@ -905,7 +929,7 @@ def explosion(selected = ' ', typeOfExplosion = 'com', complex = None,
 				remove_solvents(exclude, cutoff, storedLigands)
 			else:
 				remove_solvents(exclude, cutoff)
-
+		
 		## lists for further computations
 		s = ''
 		chains = {}
@@ -927,7 +951,6 @@ def explosion(selected = ' ', typeOfExplosion = 'com', complex = None,
 				## calculate com of obj
 				coms[obj] = calc_COM(obj)
 			s = s + ' '+ obj
-			
 		if not complex:	
 			cmd.create('_all_obj', s)
 			dim = cmd.get_extent('_all_obj')
@@ -1170,8 +1193,8 @@ def explosion(selected = ' ', typeOfExplosion = 'com', complex = None,
 		
 	print 'Explosion of', selected, time.clock() - start_time, 'seconds'
 	
-'''TODO: video muss zweimal gespeichert werden (bei erstem mal noch wackeln in 
-			letztem gespeicherten frame) '''	
+# video muss zweimal gespeichert werden (bei erstem mal noch wackeln in 
+#			letztem gespeicherten frame) '''	
 def relabel(selected, newLabels):
 	'''DESCRIPTION:
 		rename an selected object and its label by a new label
@@ -1194,8 +1217,6 @@ def relabel(selected, newLabels):
 				cmd.scene('off','update')
 				cmd.scene('on2','update')	
 			
-'''TODO: video muss zweimal gespeichert werden (bei erstem mal noch wackeln in 
-			letztem gespeicherten frame) '''
 def reorient_explosion(frame=1):
 	'''DESCRIPTION:
 		if called, the orientation of the movie is set to the orientation of 
@@ -1209,8 +1230,6 @@ def reorient_explosion(frame=1):
 		cmd.zoom('all', complete = 1)
 		cmd.mview('store')
 		
-''' TODO: 	video muss zweimal gespeichert werden (bei erstem mal noch wackeln in 
-			letztem gespeicherten frame) '''
 def renew_representation(selection, representation):
 	'''DESCRIPTION:
 		show selection in given representation for complete movie
