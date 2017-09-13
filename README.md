@@ -1,89 +1,127 @@
-# Exploded Views for Molecular Structures
+**explosion** creates a movie of the exploded view of a molecule.
+If there are multiple objects given for explosion, first they get spatially
+separated and then explode individually one after the other. The order of
+explosion is the order of given list of objects.
+There are two types of explosion direction:
+- **'com'** (default): 	the centers of mass (com) of the chains of the object to be tranlated and the object are calulated and the single chains are translated along a vector through the chain's com and 	object's com.
+- **'canonical'**:		the dimensions of a box around the object are used to select the two longest edges and so the axes to translate along in a consistent distance
 
-## Abstract
+If only a part of the object shall be translated the object can be given as
+complex to make sure the part is not translated into the object.
 
-3D protein structure models such as those deposited in the protein databank (PDB) often consist of multiple parts, e.g. multiple proteins, chains, binding partners (DNA, RNA), and ligands. Sometimes, important parts are occluded from the default viewpoint or even from *any* camera position. In order get an overview of the composition of such complex arrangements, *exploded views* as known from engineering will be applied to molecular structures in this work. An illustrative example of such an exploded view for the 70S Ribosome that was created manually is shown here on the right:
+###DEPENDENCIES:
 
-<img src='https://bmcresearch.utm.utoronto.ca/sciencevislab/wp-content/media/2013/12/70S_Ribosome_1920x1080.jpg' style='width: 640px;'></img>
+[get_colors.py](https://pymolwiki.org/index.php/Get_colors),
+[center_of_mass.py](https://pymolwiki.org/index.php/Center_of_mass),
+[viewpoints.py](https://github.com/julianheinrich/viewpoints)
+in the modules of PyMOL.
 
-We anticipate that interactive exploded views will greatly help users (in particular students) to (1) get an overview of composition of complex molecular structures and (2) better understand how the individual parts of a complex work. An additional benefit of this work is to quickly to obtain overview figures that can be used for presentation.
+###USAGE:
 
-## Related Work
-[Bruckner and Groeller](http://dl.acm.org/citation.cfm?id=1187828) first describe an algorithm for the computation of exploded views for volumetric data in a medical context. [Li et al.](http://dl.acm.org/citation.cfm?id=1360700) present methods for the automatic generation of exploded view diagrams for geometric objects in an engineering context. 
+explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cutoff [,colorBinding [, showlabels]]]]]]]
 
-## Research Questions / Contributions
-* Which are the *canonical explosion directions* for molecule complexes?
-* How to automatically label all parts without occlusion?
-* How to determine *parts* and their hierarchy of a molecular complex? 
-* How to determine the *order* by which parts are exploded?
-* How to interactively steer this process?
-* How to handle dynamic parts?
+###ARGUMENTS:
+- selected: 	names of objects to explode
+- typeOfExplosion: 	'com'(default) or 'canonical'
+- complex:	Name of object relative to the part of molecule which shall be translated
+- removeSolvents: boolean (default: True), removes all solvents and ligands with occurance bigger than cutoff value
+- exclude: 3-letter code of ligand which shall not be removed (if occurance is known to be bigger than cutoff)
+- cutoff: default: 10, occurance in PDB in total
+- colorBinding:
+ - chain: each chain has an individual color, binding sites are colored by the colors of according chains
+ - contact (default): all chains are colored gray, each binding site is colored individually
+ - none: no color is changed
+- showlabels: default: False, if set True, labels are shown in the whole movie, else only in beginning and end
 
-## Desired Features
-* User defines a rendering mode, e.g. cartoon, surface, or ball and stick
-* User selects a 'part' to expose (e.g. ligand or protein in complex, center of mass)
-* explode interactively, i.e. let user control speed
-* Label parts if not exploding
-* Select good viewpoint(s) for each frame
-* Export to movie
+###EXAMPLES:
+```python
+	# run explosion_movie.py
+	run explosion_movie.py
+```
+```python
+	reinitialize
+	# load molecule in PyMOL:
+	fetch 3oaa, type='pdb1'
+	# either explode complete molecule:
+	explosion 3oaa, colorBinding = chain, exclude = ADP ANP
+	```
+![](images/3oaa_individual_start.png)
 
-## Project Outline
+![](images/3oaa_individual_end.png)
 
-1. Find and read related work
-2. Become familiar with test structures, PDB files, and PyMOL
-3. Sketch exploding algorithm for simple test case, e.g. [Chaperonin](http://www.rcsb.org/pdb/explore.do?structureId=1AON)
-4. Implement prototype in Python/PyMOL
-5. Convey user study (e.g. with Biochemistry students) to see if exploded views support understanding of complex structures
-6. Write thesis
+```python
+	# or parts of it:
+	reinitialize
+	fetch 3oaa, type='pdb1'
+	extract AA, chain A chain B chain C chain D chain E chain F
+	extract BB, chain G chain H
+	explosion AA BB, exclude = ADP ANP
+```
+![](images/3oaa_parts_start.png)
 
-## Implementation Steps
-1. Define part hierarchy and how to obtain it from PDB files
-	* Complex, Ligands, Biological Unit, Asymetric Unit, Chains, SS, Atoms
-2. For every part: Determine explosion direction
-3. Compute explosion graph to determine order of parts
-4. Resolve interlocks, if any
-5. Explode (and compute best view)
-6. Add labels
+![](images/3oaa_parts_1.png)
 
-## Notes
+![](images/3oaa_parts_2.png)
 
-### Li2008: 
-* cutaways don't apply to Molecules
-* molecules have natural *part hierarchies*
-* [Illustrative Example](https://bmcresearch.utm.utoronto.ca/sciencevislab/wp-content/media/2013/12/70S_Ribosome_1920x1080.jpg)
+![](images/3oaa_parts_end.png)
 
-## Example Structures that could be used for testing
-* [Chaperonin](http://www.rcsb.org/pdb/explore.do?structureId=1AON)
-* [2XNV](http://www.rcsb.org/pdb/explore/explore.do?structureId=2xnv)
-* [3OAA](http://www.rcsb.org/pdb/explore/explore.do?structureId=3OAA),
-* [Dengue Virus](http://www.rcsb.org/pdb/explore/explore.do?structureId=1k4r) (use fetch 1k4r, type=pdb1 to get biological unit and set all_states, on)
-* PMP structures, molecular injection complex (e.g. http://www.ebi.ac.uk/pdbe/entry/emdb/EMD-6330)
-* Splicosome, Proteasome, Polyokapsid, http://pdb101.rcsb.org/motm
+```python
+	# or explode canonical without and canonical:
+	explosion 3oaa, typeOfExplosion = canonical, colorBinding = none, exclude ADP ANP
+```
+![](images/3oaa_canonical_start.png)
 
-Charlotta:
-3oaa: E.coli ATP synthase (8-mer)
-2IH3: K+ channel (12-mer)
-5K7L: ein anderer K+ channel (8-mer)
-1VQP: Transition state analogue "RAP" bound to the large ribosomal subunit (27-mer)
-5EN5: bacterial efflux pump (6-mer)
-5J4B: bacterial ribosome bound to cisplatin (27-mer)
-5IT8: bacterial ribosome (55-mer)
-1ERI: DNA + endonuclease (2-mer + DNA)
-4ESV: DNA + helicase (6-mer)
-3OM3: Tobacco Mosaic Virus (49-mer)
+![](images/3oaa_canonical_end.png)
 
-Für die ganz Ambitionierten:
-2BUK: Satellite Tobacco Necrosis Virus (60-mer)
-3IYN: cryo-EM structure of human adenovirus (1200-mer)
-1OHG: capsid (420-mer)
+```python
+  reinitialize
+	# load multiple symmetry operators
+	fetch 3oaa
 
-4V59: fatty acid synthase complex
+	# case sensitive for chain identifiers
+	cmd.set('ignore_case', 'off')
 
-Jens:
-Pore in Membran
+	# create object for every symmetry unit
+	extract mol1, chain A chain B chain  C chain D chain  E chain F chain G chain  H
+	extract mol2, chain I chain J chain  K chain L chain  M chain N chain O chain  P
+	extract mol3, chain Q chain R chain  S chain T chain  U chain V chain W chain  X
+	extract mol4, chain Y chain Z chain  a chain b chain  c chain d chain e chain  f
 
-## Applications
-### Labeling
-This is from a [paper](http://www.biodiscoveryjournal.co.uk/Archive/A27.htm):
-<img src='http://www.biodiscoveryjournal.co.uk/Archive/Media/A27Figure-5.jpg'></img>
+	explosion mol1 mol2 mol3 mol4, colorBinding = chain
+```
+![](images/3oaa_multi_start.png)
 
+![](images/3oaa_multi1.png)
+
+![](images/3oaa_multi2.png)
+
+![](images/3oaa_multi_end.png)
+
+```python
+    reinitialize
+	# portein with multiple states:
+	fetch 5k7l, type=pdb1
+
+	# create object for every state
+	split_states 5k7l
+    remove 5k7l
+    explosion 5k7l_0001 5k7l_0002 5k7l_0003 5k7l_0004
+```
+![](images/5k7l_start.png)
+
+![](images/5k7l_1.png)
+
+![](images/5k7l_end.png)
+
+```python
+	# load molecule
+	fetch 3oaa, type = pdb1
+
+	# create object for part or molecule
+	create chainA, chain A
+
+	explosion chainA, complex = 3oaa
+```
+![](images/chain_start.png)
+
+![](images/chain_end.png)
