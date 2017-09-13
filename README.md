@@ -11,18 +11,18 @@ There are two types of explosion direction:
 If only a part of the object shall be translated the object can be given as
 complex to make sure the part is not translated into the object.
 
-###DEPENDENCIES:
+### DEPENDENCIES:
 
 [get_colors.py](https://pymolwiki.org/index.php/Get_colors),
 [center_of_mass.py](https://pymolwiki.org/index.php/Center_of_mass),
 [viewpoints.py](https://github.com/julianheinrich/viewpoints)
 in the modules of PyMOL.
 
-###USAGE:
+### USAGE:
 
 explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cutoff [,colorBinding [, showlabels]]]]]]]
 
-###ARGUMENTS:
+### ARGUMENTS:
 - selected: 	names of objects to explode
 - typeOfExplosion: 	'com'(default) or 'canonical'
 - complex:	Name of object relative to the part of molecule which shall be translated
@@ -35,7 +35,7 @@ explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cut
  - none: no color is changed
 - showlabels: default: False, if set True, labels are shown in the whole movie, else only in beginning and end
 
-###EXAMPLES:
+### EXAMPLES:
 ```python
 	# run explosion_movie.py
 	run explosion_movie.py
