@@ -2,9 +2,11 @@
 If there are multiple objects given for explosion, first they get spatially
 separated and then explode individually one after the other. The order of
 explosion is the order of given list of objects.
+
 There are two types of explosion direction:
-- **'com'** (default): 	the centers of mass (com) of the chains of the object to be tranlated and the object are calulated and the single chains are translated along a vector through the chain's com and 	object's com.
-- **'canonical'**:		the dimensions of a box around the object are used to select the two longest edges and so the axes to translate along in a consistent distance
+
+* **'com'** (default): 	the centers of mass (com) of the chains of the object to be tranlated and the object are calulated and the single chains are translated along a vector through the chain's com and 	object's com.
+* **'canonical'**: the dimensions of a box around the object are used to select the two longest edges and so the axes to translate along in a consistent distance
 
 If only a part of the object shall be translated the object can be given as
 complex to make sure the part is not translated into the object.
@@ -38,13 +40,14 @@ explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cut
 	# run explosion_movie.py
 	run explosion_movie.py
 ```
+
 ```python
 	reinitialize
 	# load molecule in PyMOL:
 	fetch 3oaa, type='pdb1'
 	# either explode complete molecule:
 	explosion 3oaa, colorBinding = chain, exclude = ADP ANP
-	```
+```
 ![](images/3oaa_individual_start.png)
 
 ![](images/3oaa_individual_end.png)
