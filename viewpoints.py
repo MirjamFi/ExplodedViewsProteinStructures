@@ -18,7 +18,7 @@ import cv2
 import numpy as np
 from scipy.spatial import ConvexHull, Delaunay
 
-DEBUG = True
+DEBUG = False
 
 FALSE_COLOR_SETTINGS = {
     'specular': 0,

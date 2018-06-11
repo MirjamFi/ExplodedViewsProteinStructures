@@ -30,9 +30,9 @@ explosion selected [,typeOfExplosion [,complex [,removeSolvents [,exclude [, cut
 - exclude: 3-letter code of ligand which shall not be removed (if occurance is known to be bigger than cutoff)
 - cutoff: default: 10, occurance in PDB in total
 - colorBinding:
- - chain: each chain has an individual color, binding sites are colored by the colors of according chains
- - contact (default): all chains are colored gray, each binding site is colored individually
- - none: no color is changed
+	- chain: each chain has an individual color, binding sites are colored by the colors of according chains
+	- contact (default): all chains are colored gray, each binding site is colored individually
+	- none: no color is changed
 - showlabels: default: False, if set True, labels are shown in the whole movie, else only in beginning and end
 
 ### EXAMPLES:
