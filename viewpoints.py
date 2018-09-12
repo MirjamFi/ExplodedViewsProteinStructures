@@ -14,7 +14,7 @@ from axes import *
 import com #center of mass
 import random
 from collections import namedtuple
-import cv2
+#import cv2
 import numpy as np
 from scipy.spatial import ConvexHull, Delaunay
 
