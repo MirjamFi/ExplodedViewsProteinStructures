@@ -18,7 +18,7 @@ from collections import namedtuple
 import numpy as np
 from scipy.spatial import ConvexHull, Delaunay
 
-DEBUG = False
+DEBUG = True
 
 FALSE_COLOR_SETTINGS = {
     'specular': 0,
